@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}Website Footprinting // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-globe"></i> Website Footprinting Suite
+    </h1>
+    <p class="page-description">Collect web application intelligence, HTTP response headers, HTML metadata, WAF/load balancer detection, sitemaps, and directory structures.</p>
+</div>
+
+<!-- Configuration Form Card -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Target URL & Operation Selection</span>
+        <i class="fa-solid fa-sliders" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form id="footprinting-form">
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TARGET WEBSITE URL</label>
+            <input type="url" id="url-input" name="url" placeholder="e.g. http://example.com or https://target.org" required 
+                   style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">SELECT FOOTPRINTING OPERATIONS</label>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: #08080c; padding: 1.2rem; border-radius: 4px; border: 1px solid var(--border-color);">
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="whois" checked> WHOIS Lookup</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="dns" checked> DNS/IP Resolution</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="html" checked> HTML Analysis</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="headers" checked> HTTP Headers</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="server_tech" checked> Server Technologies</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="sitemap" checked> Sitemap Discovery</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="metadata" checked> Meta Tags Extraction</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="waf" checked> WAF Detection (wafw00f)</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="load_balancer" checked> Load Balancer Check</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="options" checked> HTTP OPTIONS</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="banner" checked> Socket Banner</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="directory_enum" checked> Directory Enum</label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;"><input type="checkbox" name="operations" value="proxy"> Local Proxy Check</label>
+        </div>
+
+        <!-- Warning & Mirroring Opt-In Card -->
+        <div style="background: rgba(255, 170, 0, 0.1); border: 1px solid var(--warning-amber); padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem;">
+            <div style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--warning-amber); font-weight: bold; margin-bottom: 6px;">
+                <i class="fa-solid fa-triangle-exclamation"></i> HIGH-RESOURCE OPERATION: WEBSITE MIRRORING / CRAWLING (wget)
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
+                Mirroring downloads website assets locally. This operation consumes bandwidth and disk space (capped at 5MB quota). Mirroring will never run automatically.
+            </p>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; color: #fff; cursor: pointer;">
+                <input type="checkbox" id="mirror-opt-in" name="mirror_opt_in"> I explicitly authorize website mirroring (wget) for this target URL.
+            </label>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" id="btn-start-scan" style="padding: 0.75rem 2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 10px var(--accent-red-glow);">
+                <i class="fa-solid fa-play"></i> START FOOTPRINTING
+            </button>
+            <button type="button" id="btn-clear" style="padding: 0.75rem 1.5rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">
+                <i class="fa-solid fa-eraser"></i> CLEAR
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Error Alert Box -->
+<div id="error-panel" style="display: none; background: rgba(255, 0, 60, 0.15); border: 1px solid var(--accent-red); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ff6b8b;">
+    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+    <span id="error-message"></span>
+</div>
+
+<!-- Loading Spinner Bar -->
+<div id="loading-panel" style="display: none; text-align: center; padding: 2rem; margin-bottom: 1.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--accent-red-soft);">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--accent-red); margin-bottom: 10px;"></i>
+    <div style="font-family: var(--font-mono); font-size: 1rem; color: #fff;">EXECUTING WEBSITE FOOTPRINTING...</div>
+    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Gathering web application footprints and analyzing response signatures</div>
+</div>
+
+<!-- Results Section with Modular Tabs -->
+<div id="results-section" style="display: none;">
+    <!-- Tab Controls -->
+    <div style="display: flex; gap: 8px; margin-bottom: 1rem; overflow-x: auto;" id="tab-controls">
+        <button class="enum-tab-btn active" data-target="tab-combined" style="padding: 8px 16px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; font-family: var(--font-mono); font-size: 0.85rem; border-radius: 4px; cursor: pointer;">Combined Report</button>
+    </div>
+
+    <!-- Tab Panels Container -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div id="tab-header-title">FOOTPRINTING REPORT OUTPUT</div>
+        </div>
+        <div class="terminal-body">
+            <pre id="tab-content-display" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; color: #a0a0b0; max-height: 450px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('footprinting-form');
+    const btnStart = document.getElementById('btn-start-scan');
+    const btnClear = document.getElementById('btn-clear');
+    const loadingPanel = document.getElementById('loading-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const errorMessage = document.getElementById('error-message');
+    const resultsSection = document.getElementById('results-section');
+    const tabControls = document.getElementById('tab-controls');
+    const tabContentDisplay = document.getElementById('tab-content-display');
+    const tabHeaderTitle = document.getElementById('tab-header-title');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+
+        const url = document.getElementById('url-input').value.trim();
+        const selectedOperations = Array.from(document.querySelectorAll('input[name="operations"]:checked')).map(cb => cb.value);
+        const mirrorOptIn = document.getElementById('mirror-opt-in').checked;
+
+        if (mirrorOptIn && !selectedOperations.includes('mirror')) {
+            selectedOperations.push('mirror');
+        }
+
+        if (!url) {
+            errorMessage.textContent = 'Please enter a valid website URL.';
+            errorPanel.style.display = 'block';
+            return;
+        }
+
+        if (selectedOperations.length === 0) {
+            errorMessage.textContent = 'Please select at least one footprinting operation.';
+            errorPanel.style.display = 'block';
+            return;
+        }
+
+        btnStart.disabled = true;
+        btnStart.style.opacity = '0.6';
+        loadingPanel.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/v1/scan/website-footprinting', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, operations: selectedOperations, mirror_opt_in: mirrorOptIn })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Website footprinting execution failed.');
+            }
+
+            // Render Tab Buttons
+            tabControls.innerHTML = '';
+            
+            // Combined Tab
+            const btnCombined = document.createElement('button');
+            btnCombined.textContent = 'Combined Report';
+            btnCombined.style.cssText = 'padding: 8px 16px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; font-family: var(--font-mono); font-size: 0.85rem; border-radius: 4px; cursor: pointer;';
+            btnCombined.onclick = () => switchTab('combined', data.combined_report);
+            tabControls.appendChild(btnCombined);
+
+            // Individual Operation Tabs
+            const opResults = data.operation_results || {};
+            Object.keys(opResults).forEach(opName => {
+                const btnOp = document.createElement('button');
+                btnOp.textContent = opName.toUpperCase();
+                btnOp.style.cssText = 'padding: 8px 16px; background: #121218; border: 1px solid var(--border-color); color: var(--text-muted); font-family: var(--font-mono); font-size: 0.85rem; border-radius: 4px; cursor: pointer;';
+                btnOp.onclick = () => {
+                    const res = opResults[opName];
+                    const content = res.output || 'No output.';
+                    switchTab(opName, content);
+                };
+                tabControls.appendChild(btnOp);
+            });
+
+            switchTab('combined', data.combined_report);
+            resultsSection.style.display = 'block';
+
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorPanel.style.display = 'block';
+        } finally {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            loadingPanel.style.display = 'none';
+        }
+    });
+
+    function switchTab(name, content) {
+        tabHeaderTitle.textContent = `FOOTPRINTING OUTPUT // ${name.toUpperCase()}`;
+        tabContentDisplay.textContent = content || 'No output recorded.';
+    }
+
+    btnClear.addEventListener('click', () => {
+        form.reset();
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

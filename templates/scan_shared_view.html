@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid {{ icon_class }}"></i> {{ page_title }}
+    </h1>
+    <p class="page-description">{{ page_description }}</p>
+</div>
+
+<!-- Scan Configuration Form Card -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Target & Scan Configuration</span>
+        <i class="fa-solid fa-sliders" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form id="scan-form">
+        <div style="display: grid; grid-template-columns: 1fr {% if has_scan_type %}200px{% endif %} 160px; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TARGET IP / HOSTNAME / CIDR</label>
+                <input type="text" id="target-input" name="target" placeholder="e.g. 192.168.1.1, example.com, or 10.0.0.0/24" required 
+                       style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+            </div>
+
+            {% if has_scan_type %}
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TCP TECHNIQUE</label>
+                <select id="scan-type-select" name="scan_type" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-sS" selected>-sS (TCP SYN Stealth)</option>
+                    <option value="-sT">-sT (TCP Connect)</option>
+                    <option value="-sA">-sA (TCP ACK)</option>
+                    <option value="-sW">-sW (TCP Window)</option>
+                    <option value="-sM">-sM (TCP Maimon)</option>
+                </select>
+            </div>
+            {% endif %}
+
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TIMING</label>
+                <select id="timing-select" name="timing" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-T3">T3 - Normal</option>
+                    <option value="-T4" selected>T4 - Aggressive</option>
+                    <option value="-T5">T5 - Insane</option>
+                </select>
+            </div>
+        </div>
+
+        {% if has_icmp_flags %}
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">ICMP PROBE OPTIONS</label>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; background: #08080c; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color);">
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="icmp_flags" value="-PE" checked> -PE (ICMP Echo Request)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="icmp_flags" value="-PP"> -PP (ICMP Timestamp Query)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="icmp_flags" value="-PM"> -PM (ICMP Address Mask Query)
+            </label>
+        </div>
+        {% endif %}
+
+        {% if has_port_options %}
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">PORT SPECIFICATION</label>
+            <input type="text" id="ports-input" name="ports" value="{{ default_ports }}" placeholder="e.g. 80,443 or 1-1024"
+                   style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+        {% endif %}
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" id="btn-start-scan" style="padding: 0.75rem 2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 10px var(--accent-red-glow);">
+                <i class="fa-solid fa-play"></i> START {{ mode_code }} SCAN
+            </button>
+            <button type="button" id="btn-clear" style="padding: 0.75rem 1.5rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">
+                <i class="fa-solid fa-eraser"></i> CLEAR
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Error Alert Box -->
+<div id="error-panel" style="display: none; background: rgba(255, 0, 60, 0.15); border: 1px solid var(--accent-red); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ff6b8b;">
+    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+    <span id="error-message"></span>
+</div>
+
+<!-- Loading Spinner Bar -->
+<div id="loading-panel" style="display: none; text-align: center; padding: 2rem; margin-bottom: 1.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--accent-red-soft);">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--accent-red); margin-bottom: 10px;"></i>
+    <div style="font-family: var(--font-mono); font-size: 1rem; color: #fff;">EXECUTING {{ mode_code }} SCAN...</div>
+    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Processing probe vectors against specified target</div>
+</div>
+
+<!-- Results Section -->
+<div id="results-section" style="display: none;">
+    {% if has_port_options %}
+    <!-- Structured Ports Table for TCP / UDP -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>SCAN RESULTS // {{ mode_code }} PORT TABLE</div>
+        </div>
+        <div class="terminal-body" style="padding: 0;">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Protocol</th>
+                        <th>State</th>
+                        <th>Service</th>
+                        <th>Product / Version</th>
+                    </tr>
+                </thead>
+                <tbody id="ports-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- Structured Hosts Table for ICMP -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>SCAN RESULTS // ICMP HOST RESPONSES</div>
+        </div>
+        <div class="terminal-body" style="padding: 0;">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Target Address</th>
+                        <th>Hostname</th>
+                        <th>Status</th>
+                        <th>Response Reason</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="hosts-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Raw Terminal Output Panel -->
+    <div class="terminal-window" style="margin-top: 1.5rem;">
+        <div class="terminal-header">
+            <div><i class="fa-solid fa-terminal" style="color: var(--accent-red); margin-right: 8px;"></i> RAW TERMINAL STDOUT / STDERR</div>
+        </div>
+        <div class="terminal-body">
+            <pre id="raw-output-panel" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; color: #a0a0b0; max-height: 350px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('scan-form');
+    const btnStart = document.getElementById('btn-start-scan');
+    const btnClear = document.getElementById('btn-clear');
+    const loadingPanel = document.getElementById('loading-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const errorMessage = document.getElementById('error-message');
+    const resultsSection = document.getElementById('results-section');
+    const portsTableBody = document.getElementById('ports-table-body');
+    const hostsTableBody = document.getElementById('hosts-table-body');
+    const rawOutputPanel = document.getElementById('raw-output-panel');
+
+    const apiEndpoint = "{{ api_endpoint }}";
+    const modeCode = "{{ mode_code }}";
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+
+        const target = document.getElementById('target-input').value.trim();
+        const timing = document.getElementById('timing-select').value;
+        
+        const payload = { target, timing };
+
+        const scanTypeSelect = document.getElementById('scan-type-select');
+        if (scanTypeSelect) payload.scan_type = scanTypeSelect.value;
+
+        const portsInput = document.getElementById('ports-input');
+        if (portsInput) payload.ports = portsInput.value.trim();
+
+        const icmpBoxes = document.querySelectorAll('input[name="icmp_flags"]:checked');
+        if (icmpBoxes.length > 0) {
+            payload.icmp_flags = Array.from(icmpBoxes).map(cb => cb.value);
+        }
+
+        btnStart.disabled = true;
+        btnStart.style.opacity = '0.6';
+        loadingPanel.style.display = 'block';
+
+        try {
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Scan execution failed.');
+            }
+
+            if (portsTableBody) {
+                portsTableBody.innerHTML = '';
+                const portsList = data.parsed.ports || [];
+                if (portsList.length === 0) {
+                    portsTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No ports reported for the specified target.</td></tr>`;
+                } else {
+                    portsList.forEach(p => {
+                        let stateColor = 'var(--text-muted)';
+                        if (p.state === 'open') stateColor = 'var(--success-green)';
+                        else if (p.state.includes('filtered') || p.state === 'open|filtered') stateColor = 'var(--warning-amber)';
+                        else if (p.state === 'closed') stateColor = 'var(--accent-red)';
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">${p.port}</td>
+                            <td style="font-family: var(--font-mono); color: var(--text-muted);">${p.protocol.toUpperCase()}</td>
+                            <td><span style="color: ${stateColor}; font-weight: bold;"><i class="fa-solid fa-circle" style="font-size: 0.6rem; margin-right: 6px;"></i>${p.state.toUpperCase()}</span></td>
+                            <td style="color: #fff;">${p.service || '--'}</td>
+                            <td style="color: var(--text-muted);">${(p.product + ' ' + p.version).trim() || '--'}</td>
+                        `;
+                        portsTableBody.appendChild(tr);
+                    });
+                }
+            }
+
+            if (hostsTableBody) {
+                hostsTableBody.innerHTML = '';
+                const hosts = data.parsed.hosts || [];
+                if (hosts.length === 0) {
+                    hostsTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No ICMP responses received.</td></tr>`;
+                } else {
+                    hosts.forEach(h => {
+                        const stateColor = h.state === 'up' ? 'var(--success-green)' : 'var(--accent-red)';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">${h.address}</td>
+                            <td style="color: var(--text-muted);">${h.hostname || '--'}</td>
+                            <td><span style="color: ${stateColor}; font-weight: bold;"><i class="fa-solid fa-circle" style="font-size: 0.6rem; margin-right: 6px;"></i>${h.state.toUpperCase()}</span></td>
+                            <td style="color: var(--text-muted);">${h.reason || '--'}</td>
+                            <td style="font-family: var(--font-mono); color: var(--text-muted);">${h.latency || '--'}</td>
+                        `;
+                        hostsTableBody.appendChild(tr);
+                    });
+                }
+            }
+
+            rawOutputPanel.textContent = data.execution.stdout || data.execution.stderr || 'No output recorded.';
+            resultsSection.style.display = 'block';
+
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorPanel.style.display = 'block';
+        } finally {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            loadingPanel.style.display = 'none';
+        }
+    });
+
+    btnClear.addEventListener('click', () => {
+        form.reset();
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

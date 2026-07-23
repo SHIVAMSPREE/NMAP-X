@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}404 Page Not Found // NMAP-X{% endblock %}
+
+{% block content %}
+<div class="placeholder-box" style="margin-top: 3rem;">
+    <div class="placeholder-icon" style="color: var(--accent-red);">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    <div class="placeholder-badge">ERROR 404</div>
+    <h2 class="placeholder-title">Target Vector Not Found</h2>
+    <p class="placeholder-desc">The requested route or URL path does not exist on this reconnaissance system.</p>
+    <a href="{{ url_for('dashboard') }}" class="nav-link ready" style="display: inline-block; padding: 10px 20px; text-decoration: none; border-radius: 4px;">Return to Dashboard</a>
+</div>
+{% endblock %}

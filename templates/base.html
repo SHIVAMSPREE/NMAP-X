@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NMAP-X Reconnaissance Platform{% endblock %}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Top Navbar -->
+    <header class="navbar">
+        <div class="navbar-left">
+            <button class="mobile-toggle-btn" id="mobile-menu-toggle" aria-label="Toggle navigation menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <a href="{{ url_for('dashboard') }}" class="navbar-brand">
+                <i class="fa-solid fa-shield-halved" style="color: var(--accent-red);"></i>
+                NMAP<span>-X</span>
+                <span class="brand-badge">RECON PLATFORM</span>
+            </a>
+        </div>
+        <div class="navbar-status">
+            <div class="status-badge">
+                <span class="status-indicator"></span>
+                <span>SYSTEM ONLINE</span>
+            </div>
+            <div class="time-display" id="navbar-time">--:--:-- UTC</div>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <!-- Backdrop Overlay for Mobile Drawer -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <ul class="nav-menu">
+                {% for item in nav_items %}
+                <li class="nav-item">
+                    <a href="{{ url_for(item.endpoint) }}" class="nav-link">
+                        <i class="fa-solid {{ item.icon }}"></i>
+                        <span>{{ item.name }}</span>
+                        {% if item.implemented %}
+                            <span class="nav-tag ready">READY</span>
+                        {% else %}
+                            <span class="nav-tag">DEV</span>
+                        {% endif %}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+            
+            <footer class="footer">
+                NMAP-X CYBERSECURITY RECONNAISSANCE PLATFORM &copy; 2026 // AUTHORIZED TESTING ONLY
+            </footer>
+        </main>
+    </div>
+
+    <!-- App Script -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} // Under Implementation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-code"></i> {{ title }}
+    </h1>
+    <p class="page-description">Category: {{ category }}</p>
+</div>
+
+<div class="placeholder-box">
+    <div class="placeholder-icon">
+        <i class="fa-solid fa-person-digging"></i>
+    </div>
+    <div class="placeholder-badge">MODULE UNDER IMPLEMENTATION</div>
+    <h2 class="placeholder-title">{{ title }} Engine</h2>
+    <p class="placeholder-desc">
+        {{ description }}
+    </p>
+    <p style="color: var(--text-dim); font-size: 0.85rem; font-family: var(--font-mono);">
+        Scheduled for development in Phase 2/3. Core platform foundation (Phase 1) is operating cleanly.
+    </p>
+</div>
+{% endblock %}

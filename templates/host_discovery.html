@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block title %}Host Discovery // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-network-wired"></i> Host Discovery Engine
+    </h1>
+    <p class="page-description">Identify active, reachable hosts on network segments using ICMP, TCP, UDP, and ARP ping sweeps.</p>
+</div>
+
+<!-- Scan Configuration Form Card -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Target & Discovery Options</span>
+        <i class="fa-solid fa-crosshairs" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form id="host-discovery-form">
+        <div style="display: grid; grid-template-columns: 1fr 200px; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TARGET IP / HOSTNAME / CIDR RANGE</label>
+                <input type="text" id="target-input" name="target" placeholder="e.g. 192.168.1.1, example.com, or 10.0.0.0/24" required 
+                       style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+            </div>
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TIMING TEMPLATE</label>
+                <select id="timing-select" name="timing" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-T3">T3 - Normal</option>
+                    <option value="-T4" selected>T4 - Aggressive</option>
+                    <option value="-T5">T5 - Insane</option>
+                    <option value="-T2">T2 - Polite</option>
+                    <option value="-T1">T1 - Sneaky</option>
+                </select>
+            </div>
+        </div>
+
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">PROBE TYPES (SELECT MULTIPLE)</label>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1.5rem; background: #08080c; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color);">
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-sn" checked> -sn (No port scan)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PE" checked> -PE (ICMP Echo)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PA" checked> -PA (TCP ACK Ping)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PS"> -PS (TCP SYN Ping)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PU"> -PU (UDP Ping)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PP"> -PP (ICMP Timestamp)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PM"> -PM (ICMP Netmask)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-PR"> -PR (ARP Ping)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="flags" value="-Pn"> -Pn (Skip Ping)
+            </label>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" id="btn-start-scan" style="padding: 0.75rem 2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 10px var(--accent-red-glow);">
+                <i class="fa-solid fa-play"></i> START SCAN
+            </button>
+            <button type="button" id="btn-clear" style="padding: 0.75rem 1.5rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">
+                <i class="fa-solid fa-eraser"></i> CLEAR
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Error Alert Box -->
+<div id="error-panel" style="display: none; background: rgba(255, 0, 60, 0.15); border: 1px solid var(--accent-red); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ff6b8b;">
+    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+    <span id="error-message"></span>
+</div>
+
+<!-- Loading Spinner Bar -->
+<div id="loading-panel" style="display: none; text-align: center; padding: 2rem; margin-bottom: 1.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--accent-red-soft);">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--accent-red); margin-bottom: 10px;"></i>
+    <div style="font-family: var(--font-mono); font-size: 1rem; color: #fff;">EXECUTING DISCOVERY SCAN...</div>
+    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Transmitting probe packets and processing response vectors</div>
+</div>
+
+<!-- Results Section -->
+<div id="results-section" style="display: none;">
+    <!-- Structured Hosts Table -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>DISCOVERY RESULTS // DISCOVERED HOSTS</div>
+        </div>
+        <div class="terminal-body" style="padding: 0;">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>Hostname</th>
+                        <th>State</th>
+                        <th>Reason</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="hosts-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Raw Output Panel -->
+    <div class="terminal-window" style="margin-top: 1.5rem;">
+        <div class="terminal-header">
+            <div><i class="fa-solid fa-terminal" style="color: var(--accent-red); margin-right: 8px;"></i> RAW TERMINAL STDOUT / STDERR</div>
+        </div>
+        <div class="terminal-body">
+            <pre id="raw-output-panel" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; color: #a0a0b0; max-height: 350px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('host-discovery-form');
+    const btnStart = document.getElementById('btn-start-scan');
+    const btnClear = document.getElementById('btn-clear');
+    const loadingPanel = document.getElementById('loading-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const errorMessage = document.getElementById('error-message');
+    const resultsSection = document.getElementById('results-section');
+    const hostsTableBody = document.getElementById('hosts-table-body');
+    const rawOutputPanel = document.getElementById('raw-output-panel');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Hide previous panels
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+
+        const target = document.getElementById('target-input').value.trim();
+        const timing = document.getElementById('timing-select').value;
+        const selectedFlags = Array.from(document.querySelectorAll('input[name="flags"]:checked')).map(cb => cb.value);
+
+        if (!target) {
+            errorMessage.textContent = 'Please enter a target IP, Hostname, or CIDR range.';
+            errorPanel.style.display = 'block';
+            return;
+        }
+
+        // Disable inputs and show loading state
+        btnStart.disabled = true;
+        btnStart.style.opacity = '0.6';
+        loadingPanel.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/v1/scan/host-discovery', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target, flags: selectedFlags, timing })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Scan execution failed.');
+            }
+
+            // Render Hosts Table
+            hostsTableBody.innerHTML = '';
+            const hosts = data.parsed.hosts || [];
+            
+            if (hosts.length === 0) {
+                hostsTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No hosts responded to the configured probes.</td></tr>`;
+            } else {
+                hosts.forEach(host => {
+                    const stateColor = host.state === 'up' ? 'var(--success-green)' : 'var(--accent-red)';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">${host.address}</td>
+                        <td style="color: var(--text-muted);">${host.hostname || '--'}</td>
+                        <td><span style="color: ${stateColor}; font-weight: bold;"><i class="fa-solid fa-circle" style="font-size: 0.6rem; margin-right: 6px;"></i>${host.state.toUpperCase()}</span></td>
+                        <td style="color: var(--text-muted);">${host.reason || '--'}</td>
+                        <td style="font-family: var(--font-mono); color: var(--text-muted);">${host.latency || '--'}</td>
+                    `;
+                    hostsTableBody.appendChild(tr);
+                });
+            }
+
+            // Render Raw Output
+            rawOutputPanel.textContent = data.execution.stdout || data.execution.stderr || 'No output recorded.';
+
+            resultsSection.style.display = 'block';
+
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorPanel.style.display = 'block';
+        } finally {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            loadingPanel.style.display = 'none';
+        }
+    });
+
+    btnClear.addEventListener('click', () => {
+        form.reset();
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

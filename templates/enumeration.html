@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block title %}Domain Enumeration // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-list-ol"></i> Domain & DNS Enumeration Suite
+    </h1>
+    <p class="page-description">Execute modular domain reconnaissance tools (subdomain mapping, typosquatting, WHOIS, DNS records, and AXFR zone transfers).</p>
+</div>
+
+<!-- Form Card -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Target Domain & Module Selection</span>
+        <i class="fa-solid fa-sliders" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form id="enum-form">
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TARGET DOMAIN NAME</label>
+            <input type="text" id="domain-input" name="domain" placeholder="e.g. example.com or target.org" required 
+                   style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">SELECT ENUMERATION MODULES TO EXECUTE</label>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: #08080c; padding: 1.2rem; border-radius: 4px; border: 1px solid var(--border-color);">
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;">
+                <input type="checkbox" name="modules" value="dnsmap" checked style="margin-right: 8px;"> 1. Subdomain Enum (dnsmap)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;">
+                <input type="checkbox" name="modules" value="urlcrazy" checked style="margin-right: 8px;"> 2. Typosquatting (urlcrazy)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;">
+                <input type="checkbox" name="modules" value="whois" checked style="margin-right: 8px;"> 3. WHOIS Lookup (whois)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;">
+                <input type="checkbox" name="modules" value="dnsrecon" checked style="margin-right: 8px;"> 4. DNS Enumeration (dnsrecon)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; color: #fff;">
+                <input type="checkbox" name="modules" value="zone_transfer" checked style="margin-right: 8px;"> 5. Zone Transfer (dig AXFR)
+            </label>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" id="btn-start-scan" style="padding: 0.75rem 2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 10px var(--accent-red-glow);">
+                <i class="fa-solid fa-play"></i> RUN ENUMERATION
+            </button>
+            <button type="button" id="btn-clear" style="padding: 0.75rem 1.5rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">
+                <i class="fa-solid fa-eraser"></i> CLEAR
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Missing Tools / Dependency Alert Banner -->
+<div id="dependency-panel" style="display: none; background: rgba(255, 170, 0, 0.15); border: 1px solid var(--warning-amber); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ffd066;">
+    <i class="fa-solid fa-circle-exclamation" style="margin-right: 8px;"></i>
+    <span id="dependency-message"></span>
+</div>
+
+<!-- Error Alert Box -->
+<div id="error-panel" style="display: none; background: rgba(255, 0, 60, 0.15); border: 1px solid var(--accent-red); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ff6b8b;">
+    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+    <span id="error-message"></span>
+</div>
+
+<!-- Loading Spinner Bar -->
+<div id="loading-panel" style="display: none; text-align: center; padding: 2rem; margin-bottom: 1.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--accent-red-soft);">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--accent-red); margin-bottom: 10px;"></i>
+    <div style="font-family: var(--font-mono); font-size: 1rem; color: #fff;">EXECUTING DOMAIN ENUMERATION...</div>
+    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Running selected enumeration tools sequentially against target domain</div>
+</div>
+
+<!-- Results Section with Modular Tabs -->
+<div id="results-section" style="display: none;">
+    <!-- Tab Controls -->
+    <div style="display: flex; gap: 8px; margin-bottom: 1rem; overflow-x: auto;" id="tab-controls">
+        <button class="enum-tab-btn active" data-target="tab-combined" style="padding: 8px 16px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; font-family: var(--font-mono); font-size: 0.85rem; border-radius: 4px; cursor: pointer;">Combined Report</button>
+    </div>
+
+    <!-- Tab Panels Container -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div id="tab-header-title">ENUMERATION REPORT OUTPUT</div>
+        </div>
+        <div class="terminal-body">
+            <pre id="tab-content-display" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; color: #a0a0b0; max-height: 450px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('enum-form');
+    const btnStart = document.getElementById('btn-start-scan');
+    const btnClear = document.getElementById('btn-clear');
+    const loadingPanel = document.getElementById('loading-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const errorMessage = document.getElementById('error-message');
+    const dependencyPanel = document.getElementById('dependency-panel');
+    const dependencyMessage = document.getElementById('dependency-message');
+    const resultsSection = document.getElementById('results-section');
+    const tabControls = document.getElementById('tab-controls');
+    const tabContentDisplay = document.getElementById('tab-content-display');
+    const tabHeaderTitle = document.getElementById('tab-header-title');
+
+    let currentModuleData = {};
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        errorPanel.style.display = 'none';
+        dependencyPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+
+        const domain = document.getElementById('domain-input').value.trim();
+        const selectedModules = Array.from(document.querySelectorAll('input[name="modules"]:checked')).map(cb => cb.value);
+
+        if (!domain) {
+            errorMessage.textContent = 'Please enter a target domain name.';
+            errorPanel.style.display = 'block';
+            return;
+        }
+
+        if (selectedModules.length === 0) {
+            errorMessage.textContent = 'Please select at least one enumeration module to execute.';
+            errorPanel.style.display = 'block';
+            return;
+        }
+
+        btnStart.disabled = true;
+        btnStart.style.opacity = '0.6';
+        loadingPanel.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/v1/scan/enumeration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain, modules: selectedModules })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Enumeration execution failed.');
+            }
+
+            currentModuleData = data;
+
+            // Check if any tools were missing
+            if (data.missing_tools && data.missing_tools.length > 0) {
+                dependencyMessage.textContent = `Warning: The following required CLI tools are not installed on system PATH: ${data.missing_tools.join(', ')}. Install these binaries on your system to view complete outputs.`;
+                dependencyPanel.style.display = 'block';
+            }
+
+            // Render Tab Buttons
+            tabControls.innerHTML = '';
+            
+            // Combined Tab
+            const btnCombined = document.createElement('button');
+            btnCombined.textContent = 'Combined Report';
+            btnCombined.style.cssText = 'padding: 8px 16px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; font-family: var(--font-mono); font-size: 0.85rem; border-radius: 4px; cursor: pointer;';
+            btnCombined.onclick = () => switchTab('combined', data.combined_report);
+            tabControls.appendChild(btnCombined);
+
+            // Individual Module Tabs
+            const modResults = data.module_results || {};
+            Object.keys(modResults).forEach(modName => {
+                const btnMod = document.createElement('button');
+                btnMod.textContent = modName.toUpperCase();
+                btnMod.style.cssText = 'padding: 8px 16px; background: #121218; border: 1px solid var(--border-color); color: var(--text-muted); font-family: var(--font-mono); font-size: 0.85rem; border-radius: 4px; cursor: pointer;';
+                btnMod.onclick = () => {
+                    const res = modResults[modName];
+                    const content = res.output || res.error || 'No output.';
+                    switchTab(modName, content);
+                };
+                tabControls.appendChild(btnMod);
+            });
+
+            switchTab('combined', data.combined_report);
+            resultsSection.style.display = 'block';
+
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorPanel.style.display = 'block';
+        } finally {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            loadingPanel.style.display = 'none';
+        }
+    });
+
+    function switchTab(name, content) {
+        tabHeaderTitle.textContent = `ENUMERATION OUTPUT // ${name.toUpperCase()}`;
+        tabContentDisplay.textContent = content || 'No output recorded.';
+    }
+
+    btnClear.addEventListener('click', () => {
+        form.reset();
+        errorPanel.style.display = 'none';
+        dependencyPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

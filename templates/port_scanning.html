@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+
+{% block title %}Port Scanning // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-ethernet"></i> Port Scanning Engine
+    </h1>
+    <p class="page-description">Scan open TCP and UDP ports across targets using SYN stealth, Connect, UDP, and service version probes.</p>
+</div>
+
+<!-- Scan Configuration Form Card -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Target & Port Profile Selection</span>
+        <i class="fa-solid fa-sliders" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form id="port-scanning-form">
+        <div style="display: grid; grid-template-columns: 1fr 220px 180px; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TARGET IP / HOSTNAME</label>
+                <input type="text" id="target-input" name="target" placeholder="e.g. 192.168.1.1 or example.com" required 
+                       style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+            </div>
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">SCAN TYPE</label>
+                <select id="scan-type-select" name="scan_type" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-sS" selected>-sS (TCP SYN Stealth)</option>
+                    <option value="-sT">-sT (TCP Connect)</option>
+                    <option value="-sU">-sU (UDP Scan)</option>
+                    <option value="-sA">-sA (TCP ACK Scan)</option>
+                    <option value="-sV">-sV (Service Version Probe)</option>
+                </select>
+            </div>
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TIMING</label>
+                <select id="timing-select" name="timing" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-T3">T3 - Normal</option>
+                    <option value="-T4" selected>T4 - Aggressive</option>
+                    <option value="-T5">T5 - Insane</option>
+                </select>
+            </div>
+        </div>
+
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">PORT SELECTION MODE</label>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+            <label style="background: #08080c; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer;">
+                <input type="radio" name="port_mode" value="specific" checked style="margin-right: 8px;"> Specific Ports / Ranges
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">e.g. 22,80,443 or 1-1000</div>
+            </label>
+            <label style="background: #08080c; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer;">
+                <input type="radio" name="port_mode" value="top" style="margin-right: 8px;"> Top Ports
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Scan most frequent N ports</div>
+            </label>
+            <label style="background: #08080c; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer;">
+                <input type="radio" name="port_mode" value="all" style="margin-right: 8px;"> All Ports (1-65535)
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Full 65,535 port sweep</div>
+            </label>
+        </div>
+
+        <!-- Dynamic Port Specification Fields -->
+        <div id="specific-ports-box" style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">PORTS SPECIFICATION</label>
+            <input type="text" id="ports-input" name="ports" value="21,22,25,53,80,110,143,443,3306,8080" placeholder="e.g. 80,443,8000-8080"
+                   style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+
+        <div id="top-ports-box" style="margin-bottom: 1.5rem; display: none;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TOP PORTS COUNT</label>
+            <input type="number" id="top-ports-input" name="top_ports_count" value="100" min="1" max="10000"
+                   style="width: 200px; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" id="btn-start-scan" style="padding: 0.75rem 2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 10px var(--accent-red-glow);">
+                <i class="fa-solid fa-play"></i> START PORT SCAN
+            </button>
+            <button type="button" id="btn-clear" style="padding: 0.75rem 1.5rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">
+                <i class="fa-solid fa-eraser"></i> CLEAR
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Error Alert Box -->
+<div id="error-panel" style="display: none; background: rgba(255, 0, 60, 0.15); border: 1px solid var(--accent-red); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ff6b8b;">
+    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+    <span id="error-message"></span>
+</div>
+
+<!-- Loading Spinner Bar -->
+<div id="loading-panel" style="display: none; text-align: center; padding: 2rem; margin-bottom: 1.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--accent-red-soft);">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--accent-red); margin-bottom: 10px;"></i>
+    <div style="font-family: var(--font-mono); font-size: 1rem; color: #fff;">EXECUTING PORT SCAN...</div>
+    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Probing target ports and identifying application service signatures</div>
+</div>
+
+<!-- Results Section -->
+<div id="results-section" style="display: none;">
+    <!-- Structured Ports Table -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>SCAN RESULTS // PORT SERVICE MAP</div>
+        </div>
+        <div class="terminal-body" style="padding: 0;">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Protocol</th>
+                        <th>State</th>
+                        <th>Service</th>
+                        <th>Product</th>
+                        <th>Version</th>
+                        <th>Extra Info</th>
+                    </tr>
+                </thead>
+                <tbody id="ports-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Raw Output Panel -->
+    <div class="terminal-window" style="margin-top: 1.5rem;">
+        <div class="terminal-header">
+            <div><i class="fa-solid fa-terminal" style="color: var(--accent-red); margin-right: 8px;"></i> RAW TERMINAL STDOUT / STDERR</div>
+        </div>
+        <div class="terminal-body">
+            <pre id="raw-output-panel" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; color: #a0a0b0; max-height: 350px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('port-scanning-form');
+    const btnStart = document.getElementById('btn-start-scan');
+    const btnClear = document.getElementById('btn-clear');
+    const loadingPanel = document.getElementById('loading-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const errorMessage = document.getElementById('error-message');
+    const resultsSection = document.getElementById('results-section');
+    const portsTableBody = document.getElementById('ports-table-body');
+    const rawOutputPanel = document.getElementById('raw-output-panel');
+
+    const portModeRadios = document.querySelectorAll('input[name="port_mode"]');
+    const specificPortsBox = document.getElementById('specific-ports-box');
+    const topPortsBox = document.getElementById('top-ports-box');
+
+    // Toggle Port Selection Input Visibility
+    portModeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'specific') {
+                specificPortsBox.style.display = 'block';
+                topPortsBox.style.display = 'none';
+            } else if (radio.value === 'top') {
+                specificPortsBox.style.display = 'none';
+                topPortsBox.style.display = 'block';
+            } else {
+                specificPortsBox.style.display = 'none';
+                topPortsBox.style.display = 'none';
+            }
+        });
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+
+        const target = document.getElementById('target-input').value.trim();
+        const scanType = document.getElementById('scan-type-select').value;
+        const timing = document.getElementById('timing-select').value;
+        const portSelectionType = document.querySelector('input[name="port_mode"]:checked').value;
+        const ports = document.getElementById('ports-input').value.trim();
+        const topPortsCount = parseInt(document.getElementById('top-ports-input').value, 10);
+
+        if (!target) {
+            errorMessage.textContent = 'Please enter a target IP or Hostname.';
+            errorPanel.style.display = 'block';
+            return;
+        }
+
+        btnStart.disabled = true;
+        btnStart.style.opacity = '0.6';
+        loadingPanel.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/v1/scan/port-scanning', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target,
+                    scan_type: scanType,
+                    port_selection_type: portSelectionType,
+                    ports,
+                    top_ports_count: topPortsCount,
+                    timing
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Port scan execution failed.');
+            }
+
+            // Render Ports Table
+            portsTableBody.innerHTML = '';
+            const portsList = data.parsed.ports || [];
+            
+            if (portsList.length === 0) {
+                portsTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No open/filtered ports detected for the specified target and port profile.</td></tr>`;
+            } else {
+                portsList.forEach(p => {
+                    const stateColor = p.state === 'open' ? 'var(--success-green)' : (p.state === 'filtered' ? 'var(--warning-amber)' : 'var(--accent-red)');
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">${p.port}</td>
+                        <td style="font-family: var(--font-mono); color: var(--text-muted);">${p.protocol.toUpperCase()}</td>
+                        <td><span style="color: ${stateColor}; font-weight: bold;"><i class="fa-solid fa-circle" style="font-size: 0.6rem; margin-right: 6px;"></i>${p.state.toUpperCase()}</span></td>
+                        <td style="color: #fff; font-weight: 500;">${p.service || '--'}</td>
+                        <td style="color: var(--text-muted);">${p.product || '--'}</td>
+                        <td style="color: var(--text-muted);">${p.version || '--'}</td>
+                        <td style="color: var(--text-muted); font-size: 0.85rem;">${p.extra_info || '--'}</td>
+                    `;
+                    portsTableBody.appendChild(tr);
+                });
+            }
+
+            // Render Raw Output
+            rawOutputPanel.textContent = data.execution.stdout || data.execution.stderr || 'No output recorded.';
+
+            resultsSection.style.display = 'block';
+
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorPanel.style.display = 'block';
+        } finally {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            loadingPanel.style.display = 'none';
+        }
+    });
+
+    btnClear.addEventListener('click', () => {
+        form.reset();
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

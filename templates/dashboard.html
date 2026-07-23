@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-gauge-high"></i> Command Dashboard
+    </h1>
+    <p class="page-description">Central operational overview for network reconnaissance, host discovery, footprinting, and tool diagnostics.</p>
+</div>
+
+<!-- Dashboard Metric Cards -->
+<div class="dashboard-grid">
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Total Scans Executed</span>
+            <i class="fa-solid fa-layer-group" style="color: var(--accent-red);"></i>
+        </div>
+        <div class="card-value highlight">{{ metrics.total_scans if metrics else 0 }}</div>
+    </div>
+
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Completed Scans</span>
+            <i class="fa-solid fa-square-check" style="color: var(--success-green);"></i>
+        </div>
+        <div class="card-value" style="color: var(--success-green);">{{ metrics.completed_scans if metrics else 0 }}</div>
+    </div>
+
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Failed Scans</span>
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--warning-amber);"></i>
+        </div>
+        <div class="card-value" style="color: var(--warning-amber);">{{ metrics.failed_scans if metrics else 0 }}</div>
+    </div>
+
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Hosts Discovered</span>
+            <i class="fa-solid fa-server" style="color: var(--accent-red);"></i>
+        </div>
+        <div class="card-value">{{ metrics.hosts_discovered if metrics else 0 }}</div>
+    </div>
+
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Open Ports Found</span>
+            <i class="fa-solid fa-plug" style="color: var(--accent-red);"></i>
+        </div>
+        <div class="card-value">{{ metrics.open_ports if metrics else 0 }}</div>
+    </div>
+
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Last Executed Scan</span>
+            <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-red);"></i>
+        </div>
+        <div class="card-value" style="font-size: 0.95rem; color: #fff; word-break: break-all;">
+            {% if metrics and metrics.last_scan %}
+                #{{ metrics.last_scan.id }} {{ metrics.last_scan.target }} ({{ metrics.last_scan.scan_type }})
+            {% else %}
+                None Recorded
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="cyber-card">
+        <div class="card-header-title">
+            <span>Nmap Engine Status</span>
+            <i class="fa-solid fa-terminal" style="color: var(--accent-red);"></i>
+        </div>
+        <div class="card-value" style="font-size: 1.1rem; padding-top: 5px;">
+            {% set n_stat = nmap_status.status if nmap_status else 'NOT INSTALLED' %}
+            {% if n_stat == 'ONLINE' %}
+                <span style="color: var(--success-green); font-weight: bold;"><i class="fa-solid fa-circle-check"></i> ONLINE</span>
+            {% elif n_stat == 'NOT INSTALLED' %}
+                <span style="color: var(--warning-amber); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> NOT INSTALLED</span>
+            {% else %}
+                <span style="color: var(--accent-red); font-weight: bold;"><i class="fa-solid fa-circle-xmark"></i> ERROR</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- External Tool Availability Matrix -->
+<div class="terminal-window" style="margin-bottom: 25px;">
+    <div class="terminal-header">
+        <div class="terminal-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+        </div>
+        <div>EXTERNAL TOOL STATUS // REAL SYSTEM CHECKS</div>
+    </div>
+    <div class="terminal-body" style="padding: 0;">
+        <div class="table-responsive">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Tool</th>
+                        <th>Binary</th>
+                        <th>Status</th>
+                        <th>System Path / Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set tool_list = ['nmap', 'dnsmap', 'urlcrazy', 'whois', 'dnsrecon', 'dig', 'wafw00f', 'wget'] %}
+                    {% for tool_key in tool_list %}
+                        {% set info = tool_statuses.get(tool_key, {}) if tool_statuses else {} %}
+                        {% set status_val = info.get('status', 'NOT INSTALLED') %}
+                        <tr>
+                            <td style="font-weight: bold; color: #fff;">{{ info.get('label', tool_key) }}</td>
+                            <td><code style="background: #111118; padding: 2px 6px; border-radius: 4px; color: var(--accent-red); font-family: var(--font-mono);">{{ tool_key }}</code></td>
+                            <td>
+                                {% if status_val == 'ONLINE' %}
+                                    <span style="color: var(--success-green); font-weight: bold; padding: 2px 8px; border: 1px solid var(--success-green); border-radius: 4px; background: rgba(0, 255, 65, 0.1);">
+                                        <i class="fa-solid fa-circle-check"></i> ONLINE
+                                    </span>
+                                {% elif status_val == 'NOT INSTALLED' %}
+                                    <span style="color: var(--warning-amber); font-weight: bold; padding: 2px 8px; border: 1px solid var(--warning-amber); border-radius: 4px; background: rgba(255, 170, 0, 0.1);">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> NOT INSTALLED
+                                    </span>
+                                {% else %}
+                                    <span style="color: var(--accent-red); font-weight: bold; padding: 2px 8px; border: 1px solid var(--accent-red); border-radius: 4px; background: rgba(255, 0, 60, 0.1);">
+                                        <i class="fa-solid fa-circle-xmark"></i> ERROR
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">
+                                {{ info.get('path') if info.get('path') else info.get('output', 'Not found on system PATH.') }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Scans Section -->
+<div class="terminal-window" style="border-color: var(--border-color);">
+    <div class="terminal-header">
+        <div><i class="fa-solid fa-list" style="color: var(--accent-red); margin-right: 8px;"></i> RECENT SCAN JOBS</div>
+        <div>TOTAL: {{ recent_scans|length if recent_scans else 0 }}</div>
+    </div>
+    <div class="terminal-body" style="padding: 0;">
+        {% if recent_scans %}
+        <div class="table-responsive">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Target</th>
+                        <th>Scan Type</th>
+                        <th>Status</th>
+                        <th>Duration</th>
+                        <th>Executed At</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for scan in recent_scans %}
+                    <tr>
+                        <td style="font-family: var(--font-mono); color: var(--text-dim);">#{{ scan.id }}</td>
+                        <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">{{ scan.target }}</td>
+                        <td><span style="font-family: var(--font-mono); font-size: 0.8rem; background: #1a1a24; padding: 2px 8px; border-radius: 4px; color: var(--accent-red);">{{ scan.scan_type }}</span></td>
+                        <td>
+                            {% if scan.status in ['SUCCESS', 'COMPLETED'] %}
+                                <span style="color: var(--success-green); font-weight: bold;"><i class="fa-solid fa-check-circle"></i> {{ scan.status }}</span>
+                            {% else %}
+                                <span style="color: var(--accent-red); font-weight: bold;"><i class="fa-solid fa-circle-xmark"></i> {{ scan.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-family: var(--font-mono); color: var(--text-muted);">{{ scan.duration }}s</td>
+                        <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">{{ scan.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') if scan.started_at else '--' }}</td>
+                        <td>
+                            <a href="{{ url_for('scan_detail', scan_id=scan.id) }}" style="padding: 4px 10px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; text-decoration: none; border-radius: 4px; font-family: var(--font-mono); font-size: 0.8rem;">Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            <i class="fa-solid fa-folder-open" style="font-size: 2rem; margin-bottom: 10px; color: var(--text-dim);"></i>
+            <p>No recent scans executed. Select a reconnaissance module from the sidebar to launch a target scan.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

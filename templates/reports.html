@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports & Scan Archive // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-file-contract"></i> Reports & Historical Scans
+    </h1>
+    <p class="page-description">Search, filter, inspect, and export comprehensive reconnaissance reports across all executed scan jobs.</p>
+</div>
+
+<!-- Search & Filtering Toolbar -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Search & Filter Scans</span>
+        <i class="fa-solid fa-filter" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form method="GET" action="{{ url_for('reports') }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; align-items: end;">
+        <div>
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">TARGET / SEARCH</label>
+            <input type="text" name="search" value="{{ query_params.search or '' }}" placeholder="Search target IP or domain..."
+                   style="width: 100%; padding: 0.6rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+
+        <div>
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">SCAN TYPE</label>
+            <select name="scan_type" style="width: 100%; padding: 0.6rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                <option value="">All Scan Types</option>
+                <option value="HOST_DISCOVERY" {% if query_params.scan_type == 'HOST_DISCOVERY' %}selected{% endif %}>Host Discovery</option>
+                <option value="PORT_SCANNING" {% if query_params.scan_type == 'PORT_SCANNING' %}selected{% endif %}>Port Scanning</option>
+                <option value="TCP" {% if query_params.scan_type == 'TCP' %}selected{% endif %}>TCP Scans</option>
+                <option value="UDP" {% if query_params.scan_type == 'UDP' %}selected{% endif %}>UDP Scans</option>
+                <option value="ICMP" {% if query_params.scan_type == 'ICMP' %}selected{% endif %}>ICMP Scans</option>
+                <option value="VERSION" {% if query_params.scan_type == 'VERSION' %}selected{% endif %}>Version Detection</option>
+                <option value="OS" {% if query_params.scan_type == 'OS' %}selected{% endif %}>OS Detection</option>
+                <option value="BANNER" {% if query_params.scan_type == 'BANNER' %}selected{% endif %}>Banner Grabbing</option>
+                <option value="ENUMERATION" {% if query_params.scan_type == 'ENUMERATION' %}selected{% endif %}>Domain Enumeration</option>
+                <option value="FOOTPRINTING" {% if query_params.scan_type == 'FOOTPRINTING' %}selected{% endif %}>Web Footprinting</option>
+            </select>
+        </div>
+
+        <div>
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">STATUS</label>
+            <select name="status" style="width: 100%; padding: 0.6rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                <option value="">All Statuses</option>
+                <option value="SUCCESS" {% if query_params.status == 'SUCCESS' %}selected{% endif %}>SUCCESS</option>
+                <option value="ERROR" {% if query_params.status == 'ERROR' %}selected{% endif %}>ERROR</option>
+                <option value="TIMEOUT" {% if query_params.status == 'TIMEOUT' %}selected{% endif %}>TIMEOUT</option>
+            </select>
+        </div>
+
+        <div>
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">SORT DATE</label>
+            <select name="sort" style="width: 100%; padding: 0.6rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                <option value="desc" {% if query_params.sort == 'desc' or not query_params.sort %}selected{% endif %}>Newest First</option>
+                <option value="asc" {% if query_params.sort == 'asc' %}selected{% endif %}>Oldest First</option>
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+            <button type="submit" style="padding: 0.6rem 1.2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; flex: 1;">
+                <i class="fa-solid fa-magnifying-glass"></i> FILTER
+            </button>
+            <a href="{{ url_for('reports') }}" style="padding: 0.6rem 1rem; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; text-decoration: none; font-family: var(--font-mono); display: inline-flex; align-items: center;">RESET</a>
+        </div>
+    </form>
+</div>
+
+<!-- History Table -->
+<div class="terminal-window">
+    <div class="terminal-header">
+        <div class="terminal-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+        </div>
+        <div>SCAN REPORTS INDEX (FOUND: {{ scans|length }})</div>
+    </div>
+    <div class="terminal-body" style="padding: 0;">
+        <table class="status-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Target</th>
+                    <th>Scan Type</th>
+                    <th>Status</th>
+                    <th>Date / Time</th>
+                    <th>Duration</th>
+                    <th>Hosts</th>
+                    <th>Open Ports</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if scans %}
+                    {% for scan in scans %}
+                    {% set ns = namespace(open_ports=0) %}
+                    {% for h in scan.hosts %}
+                        {% for p in h.ports %}
+                            {% if p.state == 'open' %}{% set ns.open_ports = ns.open_ports + 1 %}{% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                    <tr>
+                        <td style="font-family: var(--font-mono); color: var(--text-dim);">#{{ scan.id }}</td>
+                        <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">{{ scan.target }}</td>
+                        <td><span style="font-family: var(--font-mono); font-size: 0.8rem; background: #1a1a24; padding: 2px 8px; border-radius: 4px; color: var(--accent-red);">{{ scan.scan_type }}</span></td>
+                        <td>
+                            {% if scan.status == 'SUCCESS' %}
+                                <span style="color: var(--success-green); font-weight: bold;"><i class="fa-solid fa-check-circle"></i> SUCCESS</span>
+                            {% else %}
+                                <span style="color: var(--accent-red); font-weight: bold;"><i class="fa-solid fa-circle-xmark"></i> {{ scan.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">{{ scan.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') if scan.started_at else '--' }}</td>
+                        <td style="font-family: var(--font-mono); color: var(--text-muted);">{{ scan.duration }}s</td>
+                        <td style="font-family: var(--font-mono); color: #fff;">{{ scan.hosts|length }}</td>
+                        <td style="font-family: var(--font-mono); color: var(--success-green); font-weight: bold;">{{ ns.open_ports }}</td>
+                        <td style="white-space: nowrap;">
+                            <a href="{{ url_for('scan_detail', scan_id=scan.id) }}" style="padding: 4px 8px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; text-decoration: none; border-radius: 4px; font-family: var(--font-mono); font-size: 0.75rem; margin-right: 4px;">View</a>
+                            <a href="{{ url_for('export_report', scan_id=scan.id, format='json') }}" style="padding: 4px 8px; background: #121218; border: 1px solid var(--border-color); color: var(--text-muted); text-decoration: none; border-radius: 4px; font-family: var(--font-mono); font-size: 0.75rem; margin-right: 4px;">JSON</a>
+                            <a href="{{ url_for('export_report', scan_id=scan.id, format='csv') }}" style="padding: 4px 8px; background: #121218; border: 1px solid var(--border-color); color: var(--text-muted); text-decoration: none; border-radius: 4px; font-family: var(--font-mono); font-size: 0.75rem;">CSV</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No matching scan reports found in database.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid {{ icon_class }}"></i> {{ page_title }}
+    </h1>
+    <p class="page-description">{{ page_description }}</p>
+</div>
+
+<!-- Scan Configuration Form Card -->
+<div class="cyber-card" style="margin-bottom: 2rem;">
+    <div class="card-header-title">
+        <span>Target & Option Selection</span>
+        <i class="fa-solid fa-sliders" style="color: var(--accent-red);"></i>
+    </div>
+    
+    <form id="scan-form">
+        <div style="display: grid; grid-template-columns: 1fr {% if has_version_select or has_os_options %}220px{% endif %} 160px; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TARGET IP / HOSTNAME</label>
+                <input type="text" id="target-input" name="target" placeholder="e.g. 192.168.1.1 or example.com" required 
+                       style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+            </div>
+
+            {% if has_version_select %}
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">PROBE MODE</label>
+                <select id="version-flag-select" name="version_flag" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-sV" selected>-sV (Standard Version Probe)</option>
+                    <option value="--version-light">--version-light (Faster Probes)</option>
+                    <option value="--version-all">--version-all (Exhaustive Probes)</option>
+                </select>
+            </div>
+            {% endif %}
+
+            <div>
+                <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">TIMING</label>
+                <select id="timing-select" name="timing" style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+                    <option value="-T3">T3 - Normal</option>
+                    <option value="-T4" selected>T4 - Aggressive</option>
+                    <option value="-T5">T5 - Insane</option>
+                </select>
+            </div>
+        </div>
+
+        {% if has_os_options %}
+        <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">OS FINGERPRINT OPTIONS</label>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; background: #08080c; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color);">
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="os_options" value="--osscan-limit" checked> --osscan-limit (Limit to promising targets)
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" name="os_options" value="--osscan-guess"> --osscan-guess (Guess OS aggressively)
+            </label>
+        </div>
+        {% endif %}
+
+        {% if has_version_select %}
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">VERSION INTENSITY (0 - 9, OPTIONAL)</label>
+            <input type="number" id="intensity-input" name="intensity" placeholder="Default intensity 7" min="0" max="9"
+                   style="width: 250px; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+        {% endif %}
+
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">PORTS SPECIFICATION</label>
+            <input type="text" id="ports-input" name="ports" value="{{ default_ports }}" placeholder="e.g. 22,80,443 or 1-1000"
+                   style="width: 100%; padding: 0.8rem 1rem; background: #08080c; border: 1px solid var(--border-color); border-radius: 4px; color: #fff; font-family: var(--font-mono); outline: none;">
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" id="btn-start-scan" style="padding: 0.75rem 2rem; background: var(--accent-red); color: #fff; border: none; border-radius: 4px; font-family: var(--font-mono); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 10px var(--accent-red-glow);">
+                <i class="fa-solid fa-play"></i> START {{ mode_code }} SCAN
+            </button>
+            <button type="button" id="btn-clear" style="padding: 0.75rem 1.5rem; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">
+                <i class="fa-solid fa-eraser"></i> CLEAR
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Error Alert Box -->
+<div id="error-panel" style="display: none; background: rgba(255, 0, 60, 0.15); border: 1px solid var(--accent-red); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.9rem; color: #ff6b8b;">
+    <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i>
+    <span id="error-message"></span>
+</div>
+
+<!-- Loading Spinner Bar -->
+<div id="loading-panel" style="display: none; text-align: center; padding: 2rem; margin-bottom: 1.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--accent-red-soft);">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--accent-red); margin-bottom: 10px;"></i>
+    <div style="font-family: var(--font-mono); font-size: 1rem; color: #fff;">EXECUTING {{ mode_code }} FINGERPRINTING...</div>
+    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Analyzing response signatures and banner payloads</div>
+</div>
+
+<!-- Results Section -->
+<div id="results-section" style="display: none;">
+    {% if mode_code == 'OS' %}
+    <!-- OS Fingerprint Table -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>RESULTS // OPERATING SYSTEM MATCHES</div>
+        </div>
+        <div class="terminal-body" style="padding: 0;">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Host</th>
+                        <th>OS Match Name</th>
+                        <th>Accuracy</th>
+                        <th>Device Type</th>
+                        <th>CPE Tag</th>
+                    </tr>
+                </thead>
+                <tbody id="os-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- Version & Banner Table -->
+    <div class="terminal-window">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>RESULTS // SERVICE VERSION & BANNER INFORMATION</div>
+        </div>
+        <div class="terminal-body" style="padding: 0;">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Service</th>
+                        <th>Product</th>
+                        <th>Version</th>
+                        <th>CPE / Banner Details</th>
+                        <th>Extra Info</th>
+                    </tr>
+                </thead>
+                <tbody id="ports-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Raw Output Panel -->
+    <div class="terminal-window" style="margin-top: 1.5rem;">
+        <div class="terminal-header">
+            <div><i class="fa-solid fa-terminal" style="color: var(--accent-red); margin-right: 8px;"></i> RAW TERMINAL STDOUT / STDERR</div>
+        </div>
+        <div class="terminal-body">
+            <pre id="raw-output-panel" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; color: #a0a0b0; max-height: 350px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('scan-form');
+    const btnStart = document.getElementById('btn-start-scan');
+    const btnClear = document.getElementById('btn-clear');
+    const loadingPanel = document.getElementById('loading-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const errorMessage = document.getElementById('error-message');
+    const resultsSection = document.getElementById('results-section');
+    const portsTableBody = document.getElementById('ports-table-body');
+    const osTableBody = document.getElementById('os-table-body');
+    const rawOutputPanel = document.getElementById('raw-output-panel');
+
+    const apiEndpoint = "{{ api_endpoint }}";
+    const modeCode = "{{ mode_code }}";
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+
+        const target = document.getElementById('target-input').value.trim();
+        const timing = document.getElementById('timing-select').value;
+        const ports = document.getElementById('ports-input').value.trim();
+
+        const payload = { target, timing, ports };
+
+        const versionFlagSelect = document.getElementById('version-flag-select');
+        if (versionFlagSelect) payload.version_flag = versionFlagSelect.value;
+
+        const intensityInput = document.getElementById('intensity-input');
+        if (intensityInput && intensityInput.value !== '') {
+            payload.intensity = parseInt(intensityInput.value, 10);
+        }
+
+        const osBoxes = document.querySelectorAll('input[name="os_options"]:checked');
+        if (osBoxes.length > 0) {
+            payload.os_options = Array.from(osBoxes).map(cb => cb.value);
+        }
+
+        btnStart.disabled = true;
+        btnStart.style.opacity = '0.6';
+        loadingPanel.style.display = 'block';
+
+        try {
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Scan execution failed.');
+            }
+
+            if (osTableBody) {
+                osTableBody.innerHTML = '';
+                const osMatches = data.parsed.os_matches || [];
+                if (osMatches.length === 0) {
+                    osTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No OS matches identified. Ensure target is reachable and open/closed ports are available.</td></tr>`;
+                } else {
+                    osMatches.forEach(os => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">${os.host}</td>
+                            <td style="color: var(--success-green); font-weight: bold;">${os.name}</td>
+                            <td style="font-family: var(--font-mono); color: var(--warning-amber);">${os.accuracy}%</td>
+                            <td style="color: var(--text-muted);">${os.device_type || '--'}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">${os.cpe.join(', ') || '--'}</td>
+                        `;
+                        osTableBody.appendChild(tr);
+                    });
+                }
+            }
+
+            if (portsTableBody) {
+                portsTableBody.innerHTML = '';
+                const portsList = data.parsed.ports || [];
+                if (portsList.length === 0) {
+                    portsTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No open service ports detected.</td></tr>`;
+                } else {
+                    portsList.forEach(p => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">${p.port}/${p.protocol.toUpperCase()}</td>
+                            <td style="color: #fff; font-weight: 500;">${p.service || '--'}</td>
+                            <td style="color: var(--success-green);">${p.product || '--'}</td>
+                            <td style="color: var(--warning-amber); font-family: var(--font-mono);">${p.version || '--'}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">${p.cpe.join(', ') || '--'}</td>
+                            <td style="color: var(--text-muted); font-size: 0.85rem;">${p.extra_info || '--'}</td>
+                        `;
+                        portsTableBody.appendChild(tr);
+                    });
+                }
+            }
+
+            rawOutputPanel.textContent = data.execution.stdout || data.execution.stderr || 'No output recorded.';
+            resultsSection.style.display = 'block';
+
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorPanel.style.display = 'block';
+        } finally {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            loadingPanel.style.display = 'none';
+        }
+    });
+
+    btnClear.addEventListener('click', () => {
+        form.reset();
+        errorPanel.style.display = 'none';
+        resultsSection.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

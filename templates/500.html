@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}500 Internal Error // NMAP-X{% endblock %}
+
+{% block content %}
+<div class="placeholder-box" style="margin-top: 3rem;">
+    <div class="placeholder-icon" style="color: var(--accent-red);">
+        <i class="fa-solid fa-bug"></i>
+    </div>
+    <div class="placeholder-badge">ERROR 500</div>
+    <h2 class="placeholder-title">Internal System Fault</h2>
+    <p class="placeholder-desc">An unexpected execution exception occurred in the web server engine.</p>
+    <a href="{{ url_for('dashboard') }}" class="nav-link ready" style="display: inline-block; padding: 10px 20px; text-decoration: none; border-radius: 4px;">Return to Dashboard</a>
+</div>
+{% endblock %}

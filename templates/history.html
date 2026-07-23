@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Scan History // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fa-solid fa-history"></i> Scan History & Archive
+    </h1>
+    <p class="page-description">View, inspect, and review historical scan execution logs, discovered hosts, open ports, and raw outputs.</p>
+</div>
+
+<!-- History Table -->
+<div class="terminal-window">
+    <div class="terminal-header">
+        <div class="terminal-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+        </div>
+        <div>HISTORICAL SCAN JOBS ARCHIVE</div>
+    </div>
+    <div class="terminal-body" style="padding: 0;">
+        <table class="status-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Target</th>
+                    <th>Scan Type</th>
+                    <th>Status</th>
+                    <th>Executed At</th>
+                    <th>Duration</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if scans %}
+                    {% for scan in scans %}
+                    <tr>
+                        <td style="font-family: var(--font-mono); color: var(--text-dim);">#{{ scan.id }}</td>
+                        <td style="font-family: var(--font-mono); font-weight: bold; color: #fff;">{{ scan.target }}</td>
+                        <td><span style="font-family: var(--font-mono); font-size: 0.8rem; background: #1a1a24; padding: 2px 8px; border-radius: 4px; color: var(--accent-red);">{{ scan.scan_type }}</span></td>
+                        <td>
+                            {% if scan.status == 'SUCCESS' %}
+                                <span style="color: var(--success-green); font-weight: bold;"><i class="fa-solid fa-check-circle"></i> SUCCESS</span>
+                            {% elif scan.status == 'RUNNING' %}
+                                <span style="color: var(--warning-amber); font-weight: bold;"><i class="fa-solid fa-spinner fa-spin"></i> RUNNING</span>
+                            {% else %}
+                                <span style="color: var(--accent-red); font-weight: bold;"><i class="fa-solid fa-circle-xmark"></i> {{ scan.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">{{ scan.started_at.strftime('%Y-%m-%d %H:%M:%S UTC') if scan.started_at else '--' }}</td>
+                        <td style="font-family: var(--font-mono); color: var(--text-muted);">{{ scan.duration }}s</td>
+                        <td>
+                            <a href="{{ url_for('scan_detail', scan_id=scan.id) }}" style="padding: 4px 10px; background: var(--accent-red-soft); border: 1px solid var(--accent-red); color: #fff; text-decoration: none; border-radius: 4px; font-family: var(--font-mono); font-size: 0.8rem;">View Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No historical scans recorded in database. Run a scan from the sidebar to populate history.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

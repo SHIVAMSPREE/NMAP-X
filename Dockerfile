@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install system build tools and base security binaries available in Debian repos
+# Install system packages available in Debian repos + build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nmap \
     whois \
@@ -11,22 +11,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     gcc \
     make \
+    autoconf \
+    automake \
     ruby \
-    ruby-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Compile and install dnsmap binary from official source repository
+# Build dnsmap from source (uses autotools: autogen.sh -> configure -> make)
 RUN git clone https://github.com/resurrecting-open-source-projects/dnsmap.git /tmp/dnsmap \
-    && gcc -O2 /tmp/dnsmap/dnsmap.c -o /usr/local/bin/dnsmap \
-    && chmod +x /usr/local/bin/dnsmap \
+    && cd /tmp/dnsmap \
+    && bash autogen.sh \
+    && ./configure \
+    && make \
+    && make install \
+    && cd / \
     && rm -rf /tmp/dnsmap
 
-# Install urlcrazy via RubyGems with git clone fallback
-RUN gem install urlcrazy || (git clone https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy && ln -s /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy)
+# Install urlcrazy from GitHub (not a published gem)
+RUN git clone https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy \
+    && chmod +x /opt/urlcrazy/urlcrazy \
+    && ln -sf /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy
 
 WORKDIR /app
 
-# Copy requirements and install Python packages (Flask, Gunicorn, DNSRecon, Wafw00f, lxml, rich, etc.)
+# Copy requirements and install Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

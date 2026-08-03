@@ -356,11 +356,16 @@ def create_app(config_name=None):
     @app.route('/api/v1/scan/host-discovery', methods=['POST'])
     def api_host_discovery():
         data = request.get_json() or {}
+        from scanner.security_config import IS_CLOUD_ENV
         try:
             service = HostDiscoveryService()
+            # On cloud (Render): use TCP-based probes since ICMP raw sockets are blocked
+            cloud_flags = ['-sn', '-PS80,443', '-PA80', '-Pn']
+            local_flags = ['-sn', '-PE', '-PA']
+            default_flags = cloud_flags if IS_CLOUD_ENV else local_flags
             result = service.run_discovery(
                 target=data.get('target', ''),
-                discovery_flags=data.get('flags', ['-sn', '-PE', '-PA']),
+                discovery_flags=data.get('flags', default_flags),
                 timing=data.get('timing', '-T4')
             )
             result['scan_type'] = 'HOST_DISCOVERY'

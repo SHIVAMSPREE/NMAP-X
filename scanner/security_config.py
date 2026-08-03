@@ -3,10 +3,28 @@ Security and Execution Configuration for Scanner Operations.
 Enforces limits, whitelists, and timeouts to prevent misuse and resource exhaustion.
 """
 
+import os
+
+# ------------------------------------------------------------------
+# Cloud / Render Environment Detection
+# Render sets the RENDER environment variable automatically.
+# When running on cloud platforms (no CAP_NET_RAW), raw socket scans
+# like -sS, -sU, -O, -PE will fail. We fall back to -sT + -Pn which
+# uses TCP Connect (no raw sockets needed).
+# ------------------------------------------------------------------
+IS_CLOUD_ENV = bool(os.environ.get('RENDER') or os.environ.get('CLOUD_ENV'))
+
 # Execution Timeouts and Resource Quotas
-DEFAULT_SCAN_TIMEOUT = 300        # 5 minutes default timeout per scan task
-MAX_SCAN_TIMEOUT = 3600          # 1 hour maximum hard limit
-MAX_OUTPUT_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB maximum scan output size limit
+# On Render, HTTP gateway cuts off at ~30s so we use a tighter default.
+DEFAULT_SCAN_TIMEOUT = 25 if IS_CLOUD_ENV else 300   # 25s on cloud, 5 min locally
+MAX_SCAN_TIMEOUT = 25 if IS_CLOUD_ENV else 3600       # Hard limit matches gateway on cloud
+MAX_OUTPUT_SIZE_BYTES = 10 * 1024 * 1024              # 10 MB maximum scan output size limit
+
+# Cloud-safe scan defaults (no raw sockets required)
+# -sT  = TCP Connect scan (works without CAP_NET_RAW)
+# -Pn  = Skip host discovery ping (ICMP also needs raw sockets)
+CLOUD_SAFE_SCAN_TYPE = '-sT'
+CLOUD_SAFE_EXTRA_FLAGS = ['-Pn']
 
 # Allowed High-Level Scan Profiles
 ALLOWED_SCAN_TYPES = {

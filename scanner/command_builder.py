@@ -11,11 +11,12 @@ from scanner.validators import (
     validate_ports_input,
     check_shell_metacharacters
 )
-from scanner.security_config import ALLOWED_NMAP_FLAGS
+from scanner.security_config import ALLOWED_NMAP_FLAGS, IS_CLOUD_ENV, CLOUD_SAFE_SCAN_TYPE, CLOUD_SAFE_EXTRA_FLAGS
 
 # Explicit option allowlists per scan category
 HOST_DISCOVERY_FLAGS = {
-    '-Pn', '-sn', '-PE', '-PP', '-PM', '-PS', '-PA', '-PU', '-PR', '-n'
+    '-Pn', '-sn', '-PE', '-PP', '-PM', '-PS', '-PA', '-PU', '-PR', '-n',
+    '-PS80,443', '-PA80'
 }
 
 TCP_SCAN_FLAGS = {
@@ -147,8 +148,14 @@ def build_host_discovery_command(target: str, options: Optional[List[str]] = Non
     builder = NmapCommandBuilder(target)
     if timing:
         builder.set_timing(timing)
-    
-    default_flags = ['-sn', '-PE', '-PA'] if not options else options
+
+    if IS_CLOUD_ENV:
+        # On cloud (no CAP_NET_RAW): use TCP SYN ping (-PS) and TCP ACK (-PA)
+        # instead of ICMP (-PE) which requires raw sockets. Also add -Pn fallback.
+        default_flags = ['-sn', '-PS80,443', '-PA80', '-Pn'] if not options else options
+    else:
+        default_flags = ['-sn', '-PE', '-PA'] if not options else options
+
     builder.add_flags(default_flags, allowed_subset=HOST_DISCOVERY_FLAGS.union(TIMING_TEMPLATES))
     return builder.build()
 
@@ -159,9 +166,12 @@ def build_port_scan_command(target: str, ports: Optional[str] = None, scan_type:
         builder.set_timing(timing)
     if ports:
         builder.set_ports(ports)
-    
+
+    # On cloud (Render): -sS needs CAP_NET_RAW, fall back to -sT (TCP Connect)
+    effective_scan_type = CLOUD_SAFE_SCAN_TYPE if IS_CLOUD_ENV and scan_type == '-sS' else scan_type
     allowed = TCP_SCAN_FLAGS.union(UDP_SCAN_FLAGS).union(TIMING_TEMPLATES)
-    builder.add_flags([scan_type], allowed_subset=allowed)
+    flags = [effective_scan_type] + (CLOUD_SAFE_EXTRA_FLAGS if IS_CLOUD_ENV else [])
+    builder.add_flags(flags, allowed_subset=allowed)
     return builder.build()
 
 def build_tcp_scan_command(target: str, ports: Optional[str] = None, tcp_flag: str = "-sS", options: Optional[List[str]] = None, timing: Optional[str] = None) -> List[str]:
@@ -172,7 +182,10 @@ def build_tcp_scan_command(target: str, ports: Optional[str] = None, tcp_flag: s
     if ports:
         builder.set_ports(ports)
 
-    flags = [tcp_flag] + (options or [])
+    # On cloud: -sS requires CAP_NET_RAW; use -sT (TCP Connect) instead
+    effective_flag = CLOUD_SAFE_SCAN_TYPE if IS_CLOUD_ENV and tcp_flag == '-sS' else tcp_flag
+    extra = CLOUD_SAFE_EXTRA_FLAGS if IS_CLOUD_ENV else []
+    flags = [effective_flag] + (options or []) + extra
     builder.add_flags(flags, allowed_subset=TCP_SCAN_FLAGS.union(TIMING_TEMPLATES))
     return builder.build()
 
@@ -213,6 +226,9 @@ def build_os_detection_command(target: str, ports: Optional[str] = None, options
         builder.set_ports(ports)
 
     flags = ['-O'] + (options or [])
+    # On cloud, add -Pn so nmap doesn't try ICMP host discovery before OS detection
+    if IS_CLOUD_ENV and '-Pn' not in flags:
+        flags.append('-Pn')
     builder.add_flags(flags, allowed_subset=OS_DETECTION_FLAGS)
     return builder.build()
 

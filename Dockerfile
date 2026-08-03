@@ -24,5 +24,5 @@ EXPOSE 5000
 ENV FLASK_CONFIG=production
 ENV PYTHONUNBUFFERED=1
 
-# Run the app using Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]
+# Run the app using Gunicorn, respecting $PORT if set by cloud providers like Render
+CMD exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 "app:app"

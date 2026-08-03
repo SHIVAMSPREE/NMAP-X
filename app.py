@@ -562,6 +562,9 @@ def create_app(config_name=None):
 
     return app
 
+# WSGI entry point for production servers (Gunicorn, uWSGI, Docker)
+app = create_app(os.getenv('FLASK_CONFIG', 'production'))
+
 if __name__ == '__main__':
-    app = create_app('development')
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=(os.getenv('FLASK_CONFIG') == 'development'))

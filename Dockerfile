@@ -1,6 +1,8 @@
 FROM python:3.11-slim
 
-# Install system packages available in Debian repos + build tools
+# ============================================================
+# STEP 1: Install all Debian-available system packages
+# ============================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nmap \
     whois \
@@ -10,45 +12,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     perl \
     git \
     gcc \
-    make \
-    autoconf \
-    automake \
+    libc6-dev \
     ruby \
     && rm -rf /var/lib/apt/lists/*
 
-# Build dnsmap from source (uses autotools: autogen.sh -> configure -> make)
-RUN git clone https://github.com/resurrecting-open-source-projects/dnsmap.git /tmp/dnsmap \
-    && cd /tmp/dnsmap \
-    && bash autogen.sh \
-    && ./configure \
-    && make \
-    && make install \
-    && cd / \
+# ============================================================
+# STEP 2: Build dnsmap from source (single C file in src/)
+# ============================================================
+RUN git clone --depth 1 https://github.com/resurrecting-open-source-projects/dnsmap.git /tmp/dnsmap \
+    && gcc -O2 -o /usr/local/bin/dnsmap /tmp/dnsmap/src/dnsmap.c \
+    && chmod +x /usr/local/bin/dnsmap \
     && rm -rf /tmp/dnsmap
 
-# Install urlcrazy from GitHub (not a published gem)
-RUN git clone https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy \
+# ============================================================
+# STEP 3: Install urlcrazy from GitHub
+# ============================================================
+RUN git clone --depth 1 https://github.com/urbanadventurer/urlcrazy.git /opt/urlcrazy \
     && chmod +x /opt/urlcrazy/urlcrazy \
     && ln -sf /opt/urlcrazy/urlcrazy /usr/local/bin/urlcrazy
 
+# ============================================================
+# STEP 4: Python application setup
+# ============================================================
 WORKDIR /app
 
-# Copy requirements and install Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy remaining application code
 COPY . .
 
-# Ensure reports directory exists
 RUN mkdir -p reports
 
-# Expose default port
 EXPOSE 5000
 
-# Default environment configuration
 ENV FLASK_CONFIG=production
 ENV PYTHONUNBUFFERED=1
 
-# Run the app using Gunicorn, respecting $PORT set by cloud providers like Render
 CMD exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 "app:app"

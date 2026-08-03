@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from flask import Flask, render_template, jsonify, request, Response, make_response
 from config import config_by_name
 from models.db import db, Scan
@@ -11,8 +12,12 @@ from modules.network_scans import NetworkScanService
 from modules.fingerprinting import FingerprintingService
 from modules.enumeration import EnumerationService
 from modules.footprinting import WebFootprintingService
+from modules.vulnerability_scanner import VulnerabilityScannerService
 
 from scanner.tool_checker import ToolCheckerService
+from scanner.tool_installer import ToolInstallerService, ensure_all_python_script_paths_in_path
+
+ensure_all_python_script_paths_in_path()
 
 def create_app(config_name=None):
     if config_name is None:
@@ -53,6 +58,8 @@ def create_app(config_name=None):
             {'name': 'Banner Grabbing', 'endpoint': 'banner_grabbing', 'icon': 'fa-flag', 'implemented': True},
             {'name': 'Enumeration', 'endpoint': 'enumeration', 'icon': 'fa-list-ol', 'implemented': True},
             {'name': 'Website Footprinting', 'endpoint': 'website_footprinting', 'icon': 'fa-globe', 'implemented': True},
+            {'name': 'Vulnerability Scanner', 'endpoint': 'vulnerability_scanner', 'icon': 'fa-bug', 'implemented': True},
+            {'name': 'Dependency Manager', 'endpoint': 'dependencies', 'icon': 'fa-download', 'implemented': True},
             {'name': 'Reports & History', 'endpoint': 'reports', 'icon': 'fa-file-alt', 'implemented': True},
             {'name': 'Settings', 'endpoint': 'settings', 'icon': 'fa-cog', 'implemented': True},
         ]
@@ -166,6 +173,112 @@ def create_app(config_name=None):
     @app.route('/website-footprinting')
     def website_footprinting():
         return render_template('website_footprinting.html')
+
+    @app.route('/vulnerability-scanner')
+    def vulnerability_scanner():
+        return render_template('vulnerability_scanner.html')
+
+    @app.route('/dependencies')
+    def dependencies():
+        tool_statuses = ToolCheckerService.get_all_tool_statuses()
+        telemetry = ToolCheckerService.get_environment_telemetry()
+        source_audit = ToolCheckerService.get_application_source_audit()
+        return render_template('dependencies.html', tool_statuses=tool_statuses, telemetry=telemetry, source_audit=source_audit)
+
+    @app.route('/api/v1/dependencies/audit', methods=['GET'])
+    def api_dependencies_audit():
+        audit = ToolCheckerService.get_application_source_audit()
+        return jsonify({'audit': audit}), 200
+
+    @app.route('/api/v1/scan/vulnerability-scan', methods=['POST'])
+    def api_scan_vulnerability():
+        data = request.get_json() or {}
+        url = data.get('url', '').strip()
+        skip_nikto = bool(data.get('skip_nikto', False))
+        skip_fuzz = bool(data.get('skip_fuzz', False))
+
+        if not url:
+            return jsonify({'error': 'Target URL cannot be empty.'}), 400
+
+        try:
+            from scanner.validators import validate_url
+            target_url = validate_url(url)
+        except Exception as ve:
+            return jsonify({'error': str(ve)}), 400
+
+        service = VulnerabilityScannerService()
+        ep_res = service.discover_entry_points(target_url)
+
+        nikto_res = {"status": "SKIPPED", "output": "Nikto scan skipped by user."} if skip_nikto else service.run_nikto_scan(target_url)
+        fuzz_res = {"status": "SKIPPED", "findings": []} if skip_fuzz else service.run_fuzz_testing(target_url)
+
+        # Generate report file
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_filename = f"Web_Vulnerability_Scan_{timestamp_str}.txt"
+        report_path = os.path.join(app.config.get('REPORT_DIR', 'reports'), report_filename)
+        service.generate_ascii_report(target_url, ep_res, nikto_res, fuzz_res, report_path)
+
+        # Persist scan job
+        scan_record = ScanPersistenceManager.save_scan(
+            target=target_url,
+            scan_type="VULN_SCAN",
+            command=f"vulnerability-scanner --url {target_url}",
+            status="SUCCESS" if ep_res.get("status") == "SUCCESS" else "ERROR",
+            raw_output=f"Entry Points: {len(ep_res.get('entry_points', {}).get('forms', []))} forms found.\nNikto: {nikto_res.get('status')}\nFuzzing Findings: {len(fuzz_res.get('findings', []))}",
+            parsed_data={"entry_points": ep_res, "nikto": nikto_res, "fuzzing": fuzz_res},
+            duration=3.5,
+            error_message=ep_res.get("error")
+        )
+
+        return jsonify({
+            'status': 'SUCCESS',
+            'scan_id': scan_record.id,
+            'target_url': target_url,
+            'report_file': report_filename,
+            'entry_points': ep_res,
+            'nikto': nikto_res,
+            'fuzzing': fuzz_res
+        }), 200
+
+    @app.route('/api/v1/tools/status', methods=['GET'])
+    def api_tools_status():
+        tool_statuses = ToolCheckerService.get_all_tool_statuses()
+        telemetry = ToolCheckerService.get_environment_telemetry()
+        return jsonify({
+            'tool_statuses': tool_statuses,
+            'telemetry': telemetry
+        }), 200
+
+    @app.route('/api/v1/tools/install', methods=['POST'])
+    def api_tools_install():
+        data = request.get_json() or {}
+        tool_name = data.get('tool', '').strip().lower()
+        if not tool_name:
+            return jsonify({'error': 'Tool name cannot be empty.'}), 400
+
+        result = ToolInstallerService.install_tool(tool_name)
+        updated_status = ToolCheckerService.check_tool(tool_name)
+        result['updated_status'] = updated_status
+        status_code = 200 if result.get('success') else 400
+        return jsonify(result), status_code
+
+    @app.route('/api/v1/tools/check-all', methods=['POST'])
+    def api_tools_check_all():
+        tool_statuses = ToolCheckerService.get_all_tool_statuses()
+        return jsonify({'tool_statuses': tool_statuses}), 200
+
+    @app.route('/api/v1/tools/retry-install', methods=['POST'])
+    def api_tools_retry_install():
+        data = request.get_json() or {}
+        tool_name = data.get('tool', '').strip().lower()
+        if not tool_name:
+            return jsonify({'error': 'Tool name cannot be empty.'}), 400
+
+        result = ToolInstallerService.install_tool(tool_name)
+        updated_status = ToolCheckerService.check_tool(tool_name)
+        result['updated_status'] = updated_status
+        status_code = 200 if result.get('success') else 400
+        return jsonify(result), status_code
 
     @app.route('/reports')
     def reports():

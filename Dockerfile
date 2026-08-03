@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+# Install system dependencies and nmap
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nmap \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy dependencies and install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy remaining application code
+COPY . .
+
+# Ensure reports directory exists
+RUN mkdir -p reports
+
+# Expose default port
+EXPOSE 5000
+
+# Default environment configuration
+ENV FLASK_CONFIG=production
+ENV PYTHONUNBUFFERED=1
+
+# Run the app using Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]

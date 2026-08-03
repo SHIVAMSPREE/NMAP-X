@@ -8,6 +8,7 @@ from scanner.tool_checker import ToolCheckerService
 def app():
     app = create_app('testing')
     with app.app_context():
+        db.drop_all()
         db.create_all()
         yield app
         db.session.remove()
@@ -21,9 +22,16 @@ def test_tool_checker_service():
     statuses = ToolCheckerService.get_all_tool_statuses()
     required_tools = ['nmap', 'dnsmap', 'urlcrazy', 'whois', 'dnsrecon', 'dig', 'wafw00f', 'wget']
     
+    valid_statuses = [
+        'ONLINE', 'NOT INSTALLED', 'ERROR',
+        'UNSUPPORTED ON OS', 'UNSUPPORTED ON CURRENT OS',
+        'INSTALLED BUT NOT ON PATH', 'RUNTIME MISSING',
+        'PACKAGE INSTALLED BUT EXECUTABLE NOT FOUND',
+        'INSTALLED BUT EXECUTION FAILED', 'INSTALLATION METHOD UNAVAILABLE'
+    ]
     for tool in required_tools:
         assert tool in statuses
-        assert statuses[tool]['status'] in ['ONLINE', 'NOT INSTALLED', 'ERROR']
+        assert statuses[tool]['status'] in valid_statuses
         assert 'label' in statuses[tool]
 
 def test_dashboard_route_and_metrics(client, app):

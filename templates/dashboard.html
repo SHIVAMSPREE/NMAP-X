@@ -86,23 +86,34 @@
 
 <!-- External Tool Availability Matrix -->
 <div class="terminal-window" style="margin-bottom: 25px;">
-    <div class="terminal-header">
-        <div class="terminal-dots">
-            <span class="dot dot-red"></span>
-            <span class="dot dot-yellow"></span>
-            <span class="dot dot-green"></span>
+    <div class="terminal-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="terminal-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <div>EXTERNAL TOOL STATUS // REAL SYSTEM CHECKS</div>
         </div>
-        <div>EXTERNAL TOOL STATUS // REAL SYSTEM CHECKS</div>
+        <div style="display: flex; gap: 8px;">
+            <a href="{{ url_for('dependencies') }}" class="btn btn-secondary" style="padding: 3px 10px; font-size: 0.78rem;">
+                <i class="fa-solid fa-gear"></i> Dependency Manager
+            </a>
+            <button onclick="installAllMissingTools()" class="btn btn-primary" style="padding: 3px 10px; font-size: 0.78rem;" id="btn-dashboard-install-all">
+                <i class="fa-solid fa-download"></i> Install All Missing Tools
+            </button>
+        </div>
     </div>
     <div class="terminal-body" style="padding: 0;">
         <div class="table-responsive">
             <table class="status-table">
                 <thead>
                     <tr>
-                        <th>Tool</th>
+                        <th>Tool Name</th>
                         <th>Binary</th>
                         <th>Status</th>
-                        <th>System Path / Details</th>
+                        <th>Actionable Message & Details</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,10 +121,10 @@
                     {% for tool_key in tool_list %}
                         {% set info = tool_statuses.get(tool_key, {}) if tool_statuses else {} %}
                         {% set status_val = info.get('status', 'NOT INSTALLED') %}
-                        <tr>
+                        <tr id="dash-row-{{ tool_key }}">
                             <td style="font-weight: bold; color: #fff;">{{ info.get('label', tool_key) }}</td>
                             <td><code style="background: #111118; padding: 2px 6px; border-radius: 4px; color: var(--accent-red); font-family: var(--font-mono);">{{ tool_key }}</code></td>
-                            <td>
+                            <td id="dash-status-{{ tool_key }}">
                                 {% if status_val == 'ONLINE' %}
                                     <span style="color: var(--success-green); font-weight: bold; padding: 2px 8px; border: 1px solid var(--success-green); border-radius: 4px; background: rgba(0, 255, 65, 0.1);">
                                         <i class="fa-solid fa-circle-check"></i> ONLINE
@@ -128,8 +139,17 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">
-                                {{ info.get('path') if info.get('path') else info.get('output', 'Not found on system PATH.') }}
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-muted);" id="dash-msg-{{ tool_key }}">
+                                {{ info.get('actionable_message') if info.get('actionable_message') else (info.get('path') if info.get('path') else info.get('output', 'Not found on system PATH.')) }}
+                            </td>
+                            <td id="dash-action-{{ tool_key }}">
+                                {% if status_val != 'ONLINE' %}
+                                    <button onclick="installSingleTool('{{ tool_key }}')" class="btn btn-primary" style="padding: 3px 8px; font-size: 0.78rem;" id="dash-btn-{{ tool_key }}">
+                                        <i class="fa-solid fa-download"></i> Install
+                                    </button>
+                                {% else %}
+                                    <span style="color: var(--success-green); font-family: var(--font-mono); font-size: 0.78rem;"><i class="fa-solid fa-check"></i> Ready</span>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}

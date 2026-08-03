@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block title %}Dependency Manager & Diagnostics // NMAP-X Recon Platform{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 15px;">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-download"></i> Central Dependency Manager & Environment Diagnostics
+        </h1>
+        <p class="page-description">Tool-specific installation registry, deep Python script path candidate search, and source code audit.</p>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button onclick="refreshToolStatuses()" class="btn btn-secondary">
+            <i class="fa-solid fa-arrows-rotate"></i> Refresh Status
+        </button>
+        <button onclick="installAllMissingTools()" class="btn btn-primary" id="btn-install-all">
+            <i class="fa-solid fa-download"></i> Install All Missing Dependencies
+        </button>
+    </div>
+</div>
+
+<!-- Python Environment Diagnostics Panel -->
+<div class="terminal-window" style="margin-bottom: 25px;">
+    <div class="terminal-header">
+        <div><i class="fa-brands fa-python" style="color: var(--success-green); margin-right: 8px;"></i> PYTHON ENVIRONMENT & RUNTIME DIAGNOSTICS</div>
+    </div>
+    <div class="terminal-body">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; font-family: var(--font-mono); font-size: 0.82rem;">
+            <div style="background: #101018; padding: 12px; border-radius: 6px; border: 1px solid #222230;">
+                <div style="color: var(--text-muted); font-size: 0.75rem;">ACTIVE PYTHON INTERPRETER (sys.executable)</div>
+                <div style="color: #fff; font-weight: bold; margin-top: 4px; word-break: break-all;">{{ telemetry.python_executable }}</div>
+                <div style="color: var(--success-green); margin-top: 4px;">Python {{ telemetry.python_version }}</div>
+            </div>
+
+            <div style="background: #101018; padding: 12px; border-radius: 6px; border: 1px solid #222230;">
+                <div style="color: var(--text-muted); font-size: 0.75rem;">PYTHON PREFIX & BASE PREFIX</div>
+                <div style="color: #fff; margin-top: 4px; word-break: break-all;"><span style="color: var(--text-dim);">Prefix:</span> {{ telemetry.sys_prefix }}</div>
+                <div style="color: #fff; margin-top: 2px; word-break: break-all;"><span style="color: var(--text-dim);">Base Prefix:</span> {{ telemetry.sys_base_prefix }}</div>
+            </div>
+
+            <div style="background: #101018; padding: 12px; border-radius: 6px; border: 1px solid #222230;">
+                <div style="color: var(--text-muted); font-size: 0.75rem;">SCRIPTS & USER BASE DIRECTORY</div>
+                <div style="color: var(--success-green); margin-top: 4px; word-break: break-all;"><span style="color: var(--text-dim);">Scripts Dir:</span> {{ telemetry.python_scripts_dir }}</div>
+                <div style="color: #fff; margin-top: 2px; word-break: break-all;"><span style="color: var(--text-dim);">User Base:</span> {{ telemetry.user_base }}</div>
+            </div>
+
+            <div style="background: #101018; padding: 12px; border-radius: 6px; border: 1px solid #222230;">
+                <div style="color: var(--text-muted); font-size: 0.75rem;">VIRTUAL ENVIRONMENT & RUNTIMES</div>
+                <div style="color: #fff; margin-top: 4px;">
+                    <span style="color: var(--text-dim);">VENV:</span> 
+                    {% if telemetry.virtual_env %}
+                        <span style="color: var(--success-green);">Active ({{ telemetry.virtual_env }})</span>
+                    {% else %}
+                        <span style="color: var(--warning-amber);">No Virtualenv Active</span>
+                    {% endif %}
+                </div>
+                <div style="margin-top: 4px; display: flex; gap: 10px;">
+                    <span style="color: {% if telemetry.wsl.available %}var(--success-green){% else %}var(--text-dim){% endif %};">
+                        <i class="fa-brands fa-linux"></i> WSL: {% if telemetry.wsl.available %}Available{% else %}Missing{% endif %}
+                    </span>
+                    <span style="color: {% if telemetry.perl.available %}var(--success-green){% else %}var(--warning-amber){% endif %};">
+                        <i class="fa-solid fa-code"></i> Perl: {% if telemetry.perl.available %}Available{% else %}Missing{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unified 13-Dependency Status & Installer Matrix -->
+<div class="terminal-window" style="margin-bottom: 25px;">
+    <div class="terminal-header">
+        <div class="terminal-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+        </div>
+        <div>UNIFIED APPLICATION DEPENDENCY MATRIX // TOOL-SPECIFIC REGISTRY</div>
+    </div>
+    <div class="terminal-body" style="padding: 0;">
+        <div class="table-responsive">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Dependency Name</th>
+                        <th>Type</th>
+                        <th>Windows Native</th>
+                        <th>Status</th>
+                        <th>Actionable Diagnostics & Executable Path</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set tool_specs = [
+                        {'key': 'nmap', 'label': 'Nmap Network Scanner', 'type': 'external_tool', 'win': 'Supported'},
+                        {'key': 'dnsmap', 'label': 'DNS Map Subdomain Enumerator', 'type': 'external_tool', 'win': 'Unsupported'},
+                        {'key': 'urlcrazy', 'label': 'URLCrazy Typo Squatting', 'type': 'external_tool', 'win': 'Unsupported'},
+                        {'key': 'whois', 'label': 'WHOIS Lookup Utility', 'type': 'external_tool', 'win': 'Check Package Manager'},
+                        {'key': 'dnsrecon', 'label': 'DNSRecon Reconnaissance', 'type': 'external_tool', 'win': 'Supported (pip)'},
+                        {'key': 'dig', 'label': 'Dig DNS Lookup Utility', 'type': 'external_tool', 'win': 'Check Package Manager'},
+                        {'key': 'wafw00f', 'label': 'Wafw00f WAF Detector', 'type': 'external_tool', 'win': 'Supported (pip)'},
+                        {'key': 'wget', 'label': 'Wget Web Mirror Utility', 'type': 'external_tool', 'win': 'Check Package Manager'},
+                        {'key': 'nikto', 'label': 'Nikto Vulnerability Scanner', 'type': 'external_tool', 'win': 'Requires Perl Runtime'},
+                        {'key': 'requests', 'label': 'Requests HTTP Library', 'type': 'python_package', 'win': 'Supported'},
+                        {'key': 'beautifulsoup4', 'label': 'BeautifulSoup4 HTML Parser', 'type': 'python_package', 'win': 'Supported'},
+                        {'key': 'lxml', 'label': 'LXML XML/HTML Parser', 'type': 'python_package', 'win': 'Supported'},
+                        {'key': 'rich', 'label': 'Rich Terminal Formatting', 'type': 'python_package', 'win': 'Supported'}
+                    ] %}
+                    {% for tool in tool_specs %}
+                        {% set tool_key = tool.key %}
+                        {% set info = tool_statuses.get(tool_key, {}) if tool_statuses else {} %}
+                        {% set status_val = info.get('status', 'NOT INSTALLED') %}
+                        <tr id="tool-row-{{ tool_key }}">
+                            <td style="font-weight: bold; color: #fff;">
+                                {{ tool.label }}<br>
+                                <code style="background: #111118; padding: 1px 5px; border-radius: 3px; color: var(--accent-red); font-family: var(--font-mono); font-size: 0.78rem;">{{ tool_key }}</code>
+                            </td>
+                            <td style="font-family: var(--font-mono); font-size: 0.8rem;">
+                                {% if tool.type == 'python_package' %}
+                                    <span style="color: var(--success-green);"><i class="fa-brands fa-python"></i> Python Package</span>
+                                {% else %}
+                                    <span style="color: var(--warning-amber);"><i class="fa-solid fa-terminal"></i> External Tool</span>
+                                {% endif %}
+                            </td>
+                            <td style="font-family: var(--font-mono); font-size: 0.8rem;">
+                                {% if tool.win == 'Supported' or tool.win == 'Supported (pip)' %}
+                                    <span style="color: var(--success-green);"><i class="fa-solid fa-check"></i> Supported</span>
+                                {% elif tool.win == 'Unsupported' %}
+                                    <span style="color: var(--accent-red);"><i class="fa-solid fa-xmark"></i> Unsupported</span>
+                                {% else %}
+                                    <span style="color: var(--warning-amber);"><i class="fa-solid fa-triangle-exclamation"></i> {{ tool.win }}</span>
+                                {% endif %}
+                            </td>
+                            <td id="status-cell-{{ tool_key }}">
+                                {% if status_val == 'ONLINE' %}
+                                    <span style="color: var(--success-green); font-weight: bold; padding: 2px 8px; border: 1px solid var(--success-green); border-radius: 4px; background: rgba(0, 255, 65, 0.1);">
+                                        <i class="fa-solid fa-circle-check"></i> ONLINE
+                                    </span>
+                                {% elif status_val == 'UNSUPPORTED ON OS' %}
+                                    <span style="color: #a855f7; font-weight: bold; padding: 2px 8px; border: 1px solid #a855f7; border-radius: 4px; background: rgba(168, 85, 247, 0.1);">
+                                        <i class="fa-solid fa-ban"></i> UNSUPPORTED ON OS
+                                    </span>
+                                {% elif status_val == 'RUNTIME MISSING' %}
+                                    <span style="color: #eab308; font-weight: bold; padding: 2px 8px; border: 1px solid #eab308; border-radius: 4px; background: rgba(234, 179, 8, 0.1);">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> RUNTIME MISSING
+                                    </span>
+                                {% elif status_val == 'NOT INSTALLED' %}
+                                    <span style="color: var(--warning-amber); font-weight: bold; padding: 2px 8px; border: 1px solid var(--warning-amber); border-radius: 4px; background: rgba(255, 170, 0, 0.1);">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> NOT INSTALLED
+                                    </span>
+                                {% elif status_val == 'INSTALLED BUT NOT ON PATH' %}
+                                    <span style="color: #3b82f6; font-weight: bold; padding: 2px 8px; border: 1px solid #3b82f6; border-radius: 4px; background: rgba(59, 130, 246, 0.1);">
+                                        <i class="fa-solid fa-folder-open"></i> NOT ON PATH
+                                    </span>
+                                {% elif status_val == 'PACKAGE INSTALLED BUT EXECUTABLE NOT FOUND' %}
+                                    <span style="color: #f97316; font-weight: bold; padding: 2px 8px; border: 1px solid #f97316; border-radius: 4px; background: rgba(249, 115, 22, 0.1);">
+                                        <i class="fa-solid fa-file-excel"></i> EXE NOT FOUND
+                                    </span>
+                                {% elif status_val == 'INSTALLED BUT EXECUTION FAILED' %}
+                                    <span style="color: #ef4444; font-weight: bold; padding: 2px 8px; border: 1px solid #ef4444; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">
+                                        <i class="fa-solid fa-file-circle-xmark"></i> EXEC FAILED
+                                    </span>
+                                {% else %}
+                                    <span style="color: var(--accent-red); font-weight: bold; padding: 2px 8px; border: 1px solid var(--accent-red); border-radius: 4px; background: rgba(255, 0, 60, 0.1);">
+                                        <i class="fa-solid fa-circle-xmark"></i> {{ status_val }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td style="font-size: 0.82rem; color: var(--text-muted);" id="msg-cell-{{ tool_key }}">
+                                {% if info.get('path') %}
+                                    <div style="color: var(--success-green); font-family: var(--font-mono); font-size: 0.78rem; word-break: break-all;">
+                                        <i class="fa-solid fa-folder"></i> {{ info.get('path') }}
+                                    </div>
+                                {% endif %}
+                                <div style="margin-top: 2px;">{{ info.get('actionable_message', 'Check status.') }}</div>
+                            </td>
+                            <td id="action-cell-{{ tool_key }}">
+                                {% if status_val == 'ONLINE' %}
+                                    <span style="color: var(--success-green); font-family: var(--font-mono); font-size: 0.78rem;"><i class="fa-solid fa-check"></i> Ready</span>
+                                {% elif status_val == 'UNSUPPORTED ON OS' %}
+                                    {% if telemetry.wsl.available %}
+                                        <button onclick="alert('Run inside WSL terminal: sudo apt install {{ tool_key }}')" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.78rem;">
+                                            <i class="fa-brands fa-linux"></i> Install in WSL
+                                        </button>
+                                    {% else %}
+                                        <button onclick="alert('{{ info.get('actionable_message', 'Unsupported tool on Windows.') }}')" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.78rem;">
+                                            <i class="fa-solid fa-info-circle"></i> Instructions
+                                        </button>
+                                    {% endif %}
+                                {% else %}
+                                    <button onclick="retryInstallTool('{{ tool_key }}')" class="btn btn-primary" style="padding: 3px 8px; font-size: 0.78rem;" id="btn-install-{{ tool_key }}">
+                                        <i class="fa-solid fa-arrows-rotate"></i> Retry / Install
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Source Code Dependency Audit Panel -->
+<div class="terminal-window" style="margin-bottom: 25px;">
+    <div class="terminal-header">
+        <div><i class="fa-solid fa-file-code" style="color: var(--accent-red); margin-right: 8px;"></i> APPLICATION SOURCE CODE DEPENDENCY AUDIT</div>
+    </div>
+    <div class="terminal-body" style="padding: 0;">
+        <div class="table-responsive">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Source File / Script</th>
+                        <th>Dependency</th>
+                        <th>Requirement Type</th>
+                        <th>Code Import / Call Detected</th>
+                        <th>Installation Method</th>
+                        <th>Verification Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in source_audit %}
+                    <tr>
+                        <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #fff;">
+                            {{ item.file }}<br>
+                            <span style="color: var(--text-dim); font-size: 0.75rem;">Ref: {{ item.original_source }}</span>
+                        </td>
+                        <td style="font-family: var(--font-mono); font-weight: bold; color: var(--accent-red);">
+                            {{ item.dependency }}
+                        </td>
+                        <td style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);">
+                            {{ item.type }}
+                        </td>
+                        <td>
+                            <code style="background: #111118; padding: 2px 6px; border-radius: 4px; color: var(--success-green); font-family: var(--font-mono); font-size: 0.8rem;">{{ item.detected_code }}</code>
+                        </td>
+                        <td style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);">
+                            {{ item.install_method }}
+                        </td>
+                        <td>
+                            {% if item.status == 'ONLINE' %}
+                                <span style="color: var(--success-green); font-weight: bold;"><i class="fa-solid fa-circle-check"></i> ONLINE</span>
+                            {% else %}
+                                <span style="color: var(--warning-amber); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> {{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Process Runtime PATH Information Section -->
+<div class="terminal-window" style="margin-bottom: 25px;">
+    <div class="terminal-header">
+        <div><i class="fa-solid fa-folder-tree" style="color: var(--accent-red); margin-right: 8px;"></i> PROCESS RUNTIME PATH DIRECTORIES</div>
+    </div>
+    <div class="terminal-body">
+        <ul style="list-style: none; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-muted);">
+            {% for dir_path in telemetry.path_directories %}
+                <li style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                    <i class="fa-solid fa-folder" style="color: var(--accent-red); margin-right: 8px;"></i> {{ dir_path }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<!-- Live Installation & Diagnostic Logs Panel -->
+<div class="terminal-window">
+    <div class="terminal-header">
+        <div><i class="fa-solid fa-terminal" style="color: var(--accent-red); margin-right: 8px;"></i> INSTALLATION & DIAGNOSTIC LOGS</div>
+        <button onclick="clearInstallationLogs()" style="background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-family: var(--font-mono); font-size: 0.8rem;">Clear Logs</button>
+    </div>
+    <div class="terminal-body" style="background: #040406;">
+        <pre id="installation-log" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--success-green); max-height: 250px; overflow-y: auto; white-space: pre-wrap; margin: 0;">Ready. Select a tool or Python package above to begin automated installation.</pre>
+    </div>
+</div>
+{% endblock %}

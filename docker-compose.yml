@@ -1,0 +1,16 @@
+services:
+  nmap-x:
+    build: .
+    container_name: nmap-x
+    ports:
+      - "5000:5000"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - ./reports:/app/reports
+      - ./nmap_x.db:/app/nmap_x.db
+    environment:
+      - FLASK_CONFIG=default
+      - SECRET_KEY=nmap_x_super_secret_key_change_in_production
+    restart: unless-stopped

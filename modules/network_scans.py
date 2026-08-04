@@ -17,6 +17,7 @@ from scanner.command_builder import (
 )
 from scanner.nmap_engine import NmapExecutionEngine, ScanExecutionResult
 from scanner.result_parser import NmapResultParser, ParsedScanResult
+from scanner.security_config import IS_CLOUD_ENV, CLOUD_SAFE_SCAN_TYPE
 
 class NetworkScanService:
     """
@@ -39,7 +40,9 @@ class NetworkScanService:
 
         builder = NmapCommandBuilder(validated_target)
         builder.set_timing(timing)
-        builder.add_flags([tcp_flag], allowed_subset=TCP_SCAN_FLAGS.union({'-T0','-T1','-T2','-T3','-T4','-T5'}))
+        # On cloud: -sS needs CAP_NET_RAW; auto-swap to -sT (TCP Connect)
+        effective_flag = CLOUD_SAFE_SCAN_TYPE if IS_CLOUD_ENV and tcp_flag == '-sS' else tcp_flag
+        builder.add_flags([effective_flag], allowed_subset=TCP_SCAN_FLAGS.union({'-T0','-T1','-T2','-T3','-T4','-T5'}))
 
         if ports:
             builder.set_ports(validate_ports_input(ports))
@@ -109,7 +112,8 @@ class NetworkScanService:
         validated_target = validate_target_host(target)
 
         if not icmp_flags:
-            icmp_flags = ['-PE', '-sn']
+            # On cloud: ICMP raw sockets are blocked; use TCP-based host probing instead
+            icmp_flags = ['-sn', '-PS80,443', '-PA80', '-Pn'] if IS_CLOUD_ENV else ['-PE', '-sn']
 
         builder = NmapCommandBuilder(validated_target)
         builder.set_timing(timing)

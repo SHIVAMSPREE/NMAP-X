@@ -8,6 +8,7 @@ from scanner.validators import validate_target_host, ValidationError
 from scanner.command_builder import build_host_discovery_command, NmapCommandBuilder, HOST_DISCOVERY_FLAGS
 from scanner.nmap_engine import NmapExecutionEngine, ScanExecutionResult
 from scanner.result_parser import NmapResultParser, ParsedScanResult
+from scanner.security_config import IS_CLOUD_ENV
 
 class HostDiscoveryService:
     """
@@ -30,8 +31,9 @@ class HostDiscoveryService:
         validated_target = validate_target_host(target)
 
         # Default discovery flags if none selected
+        # On cloud (Render): ICMP raw sockets are blocked; use TCP probes instead
         if not discovery_flags:
-            discovery_flags = ['-sn', '-PE', '-PA']
+            discovery_flags = ['-sn', '-PS80,443', '-PA80', '-Pn'] if IS_CLOUD_ENV else ['-sn', '-PE', '-PA']
 
         # Include -oX - flag for XML output parsing
         builder = NmapCommandBuilder(validated_target)

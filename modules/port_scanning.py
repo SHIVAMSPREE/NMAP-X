@@ -8,6 +8,7 @@ from scanner.validators import validate_target_host, validate_ports_input, Valid
 from scanner.command_builder import build_tcp_scan_command, NmapCommandBuilder, TCP_SCAN_FLAGS, UDP_SCAN_FLAGS
 from scanner.nmap_engine import NmapExecutionEngine, ScanExecutionResult
 from scanner.result_parser import NmapResultParser, ParsedScanResult
+from scanner.security_config import IS_CLOUD_ENV, CLOUD_SAFE_SCAN_TYPE
 
 class PortScanningService:
     """
@@ -43,9 +44,10 @@ class PortScanningService:
         builder = NmapCommandBuilder(validated_target)
         builder.set_timing(timing)
 
-        # Apply scan type flag
+        # Apply scan type flag; on cloud auto-swap -sS to -sT (TCP Connect - no raw socket needed)
+        effective_scan_type = CLOUD_SAFE_SCAN_TYPE if IS_CLOUD_ENV and scan_type == '-sS' else scan_type
         allowed_flags = TCP_SCAN_FLAGS.union(UDP_SCAN_FLAGS).union({'-sV', '-O', '-T0','-T1','-T2','-T3','-T4','-T5'})
-        builder.add_flags([scan_type], allowed_subset=allowed_flags)
+        builder.add_flags([effective_scan_type], allowed_subset=allowed_flags)
 
         # Port Selection Logic
         if port_selection_type == "specific":

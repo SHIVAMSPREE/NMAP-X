@@ -13,6 +13,9 @@ from scanner.validators import (
 )
 from scanner.security_config import ALLOWED_NMAP_FLAGS, IS_CLOUD_ENV, CLOUD_SAFE_SCAN_TYPE, CLOUD_SAFE_EXTRA_FLAGS
 
+# RAW-SOCKET scan types that require CAP_NET_RAW — blocked on cloud platforms like Render
+_RAW_SOCKET_FLAGS = {'-sS', '-sU', '-PE', '-PP', '-PM'}
+
 # Explicit option allowlists per scan category
 HOST_DISCOVERY_FLAGS = {
     '-Pn', '-sn', '-PE', '-PP', '-PM', '-PS', '-PA', '-PU', '-PR', '-n',
@@ -123,8 +126,24 @@ class NmapCommandBuilder:
     def build(self) -> List[str]:
         cmd = [self.nmap_binary]
 
+        # -------------------------------------------------------
+        # Cloud Safety: On Render (no CAP_NET_RAW), automatically
+        # replace raw-socket scan flags with TCP Connect equivalents
+        # and inject -Pn to skip ICMP host-discovery pings.
+        # -------------------------------------------------------
+        effective_flags = set(self._flags)
+        if IS_CLOUD_ENV:
+            # Replace any raw-socket scan type with -sT (TCP Connect)
+            if effective_flags & {'-sS', '-sU'}:
+                effective_flags -= {'-sS', '-sU'}
+                effective_flags.add(CLOUD_SAFE_SCAN_TYPE)   # -sT
+            # Remove ICMP probe flags that need raw sockets
+            effective_flags -= {'-PE', '-PP', '-PM'}
+            # Always add -Pn (skip host discovery ping) on cloud
+            effective_flags.add('-Pn')
+
         # Add flags sorted for deterministic order
-        for flag in sorted(self._flags):
+        for flag in sorted(effective_flags):
             cmd.append(flag)
 
         # Custom arguments (e.g. --version-intensity 5)

@@ -17,6 +17,7 @@ from scanner.command_builder import (
 )
 from scanner.nmap_engine import NmapExecutionEngine, ScanExecutionResult
 from scanner.result_parser import NmapResultParser, ParsedScanResult
+from scanner.security_config import IS_CLOUD_ENV, CLOUD_SAFE_SCAN_TYPE
 
 class FingerprintingService:
     """
@@ -42,6 +43,11 @@ class FingerprintingService:
 
         allowed = VERSION_DETECTION_FLAGS.union({'-T0','-T1','-T2','-T3','-T4','-T5'})
         builder.add_flags([version_flag], allowed_subset=allowed)
+
+        # On cloud: nmap -sV defaults to -sS internally which needs CAP_NET_RAW.
+        # Inject -sT (TCP Connect) + -Pn so version detection actually works.
+        if IS_CLOUD_ENV:
+            builder.add_flags([CLOUD_SAFE_SCAN_TYPE, '-Pn'], allowed_subset=allowed.union({'-sT', '-Pn'}))
 
         if intensity is not None:
             builder.add_version_intensity(intensity)
@@ -83,6 +89,10 @@ class FingerprintingService:
         allowed = OS_DETECTION_FLAGS.union({'-T0','-T1','-T2','-T3','-T4','-T5'})
         builder.add_flags(flags, allowed_subset=allowed)
 
+        # On cloud: always add -Pn to skip ICMP host discovery before OS fingerprint
+        if IS_CLOUD_ENV and '-Pn' not in flags:
+            builder.add_flags(['-Pn'], allowed_subset={'-Pn'})
+
         if ports:
             builder.set_ports(validate_ports_input(ports))
 
@@ -115,6 +125,10 @@ class FingerprintingService:
 
         allowed = BANNER_GRABBING_FLAGS.union({'-T0','-T1','-T2','-T3','-T4','-T5'})
         builder.add_flags(['-sV', '--script=banner'], allowed_subset=allowed)
+
+        # On cloud: inject -sT + -Pn so banner grabbing works without raw sockets
+        if IS_CLOUD_ENV:
+            builder.add_flags([CLOUD_SAFE_SCAN_TYPE, '-Pn'], allowed_subset=allowed.union({'-sT', '-Pn'}))
 
         if ports:
             builder.set_ports(validate_ports_input(ports))
